@@ -10,6 +10,7 @@ from textwrap import dedent
 from typing import Annotated, Any
 
 from langchain.agents import create_agent
+from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import (
     BaseMessage,
     HumanMessage,
@@ -90,11 +91,7 @@ class RagAgentService:
         self.streaming = streaming
         self.system_prompt = self._build_system_prompt()
 
-        self.model = llm_factory.create_chat_model(
-            role="chat",
-            model=self.model_name,
-            streaming=streaming,
-        )
+        self.model: BaseChatModel | None = None
 
         self.tools: list = []
 
@@ -128,6 +125,11 @@ class RagAgentService:
                     logger.warning(f"MCP 配置 [{name}]: {hint}")
 
             self.tools = await tool_registry.get_tools_for_agent("legacy_chat")
+            self.model = llm_factory.create_chat_model(
+                role="chat",
+                model=self.model_name,
+                streaming=self.streaming,
+            )
             self.agent = create_agent(
                 self.model,
                 tools=self.tools,

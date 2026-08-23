@@ -1,7 +1,7 @@
 """Central tool registry with explicit agent-level permissions."""
 
 from dataclasses import dataclass
-from typing import Literal
+from typing import Any, Literal
 
 from langchain_core.tools import BaseTool
 from pydantic import BaseModel, Field
@@ -18,12 +18,14 @@ ToolSource = Literal["local", "mcp"]
 
 class ToolSpec(BaseModel):
     name: str
+    description: str
     category: str
     read_only: bool = True
     allowed_agents: set[AgentName] = Field(default_factory=set)
     timeout_seconds: float
     source: ToolSource
     server_name: str | None = None
+    input_schema: dict[str, Any] = Field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)
@@ -61,11 +63,13 @@ class ToolRegistry:
             raise DuplicateToolNameError(f"Duplicate local tool name: {tool.name!r}")
         spec = ToolSpec(
             name=tool.name,
+            description=tool.description,
             category=category,
             read_only=read_only,
             allowed_agents=allowed_agents,
             timeout_seconds=self._settings.tool_timeout_seconds,
             source="local",
+            input_schema=tool.get_input_schema().model_json_schema(),
         )
         self._local[tool.name] = RegisteredTool(spec=spec, tool=tool)
 
@@ -75,11 +79,23 @@ class ToolRegistry:
         *,
         include_mcp: bool = True,
     ) -> list[BaseTool]:
+        registered = await self.get_registered_tools_for_agent(
+            agent_name,
+            include_mcp=include_mcp,
+        )
+        return [item.tool for item in registered]
+
+    async def get_registered_tools_for_agent(
+        self,
+        agent_name: AgentName,
+        *,
+        include_mcp: bool = True,
+    ) -> list[RegisteredTool]:
         registered = list(self._local.values())
-        if include_mcp and agent_name in {"legacy_chat", "data", "task"}:
+        if include_mcp and agent_name in {"legacy_chat", "data"}:
             await self._load_mcp_tools()
             registered.extend(self._mcp.values())
-        return [item.tool for item in registered if agent_name in item.spec.allowed_agents]
+        return [item for item in registered if agent_name in item.spec.allowed_agents]
 
     async def get_tool_descriptions(self, agent_name: AgentName) -> list[ToolSpec]:
         await self.get_tools_for_agent(agent_name)
@@ -105,11 +121,13 @@ class ToolRegistry:
                 raise DuplicateToolNameError(f"Tool name collision: {name!r}")
             spec = ToolSpec(
                 name=name,
+                description=item.tool.description,
                 category="external_data",
-                allowed_agents={"legacy_chat", "data", "task"},
+                allowed_agents={"legacy_chat", "data"},
                 timeout_seconds=self._settings.tool_timeout_seconds,
                 source="mcp",
                 server_name=item.server_name,
+                input_schema=item.tool.get_input_schema().model_json_schema(),
             )
             mcp_tools[name] = RegisteredTool(spec=spec, tool=item.tool)
         self._mcp = mcp_tools
@@ -122,17 +140,17 @@ def create_default_tool_registry(
     registry.register_local(
         retrieve_knowledge,
         category="knowledge",
-        allowed_agents={"legacy_chat", "knowledge", "task"},
+        allowed_agents={"legacy_chat", "knowledge"},
     )
     registry.register_local(
         get_current_time,
         category="utility",
-        allowed_agents={"legacy_chat", "data", "task"},
+        allowed_agents={"legacy_chat", "data"},
     )
     registry.register_local(
         query_prometheus_alerts,
         category="external_data",
-        allowed_agents={"legacy_chat", "data", "task"},
+        allowed_agents={"legacy_chat", "data"},
     )
     return registry
 

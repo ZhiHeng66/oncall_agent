@@ -45,6 +45,4 @@ async def test_mcp_client_creation_failure_is_cached_as_unavailable() -> None:
 
     assert await provider.get_tools() == []
     assert all(status.status == "unavailable" for status in provider.health().values())
-    assert all(
-        "private-value" not in (status.error or "") for status in provider.health().values()
-    )
+    assert all("private-value" not in (status.error or "") for status in provider.health().values())

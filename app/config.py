@@ -3,16 +3,19 @@
 使用 Pydantic Settings 实现类型安全的配置管理
 """
 
+import os
 from typing import Any
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+_ENV_FILE = None if os.getenv("ONCALL_DISABLE_ENV_FILE") == "1" else ".env"
 
 
 class Settings(BaseSettings):
     """应用配置"""
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=_ENV_FILE,
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",
@@ -27,6 +30,7 @@ class Settings(BaseSettings):
 
     # DashScope 配置
     dashscope_api_key: str = ""  # 默认空字符串，实际使用需从环境变量加载
+    dashscope_base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
     dashscope_model: str = "qwen-max"
     dashscope_embedding_model: str = "text-embedding-v4"  # v4 支持多种维度（默认 1024）
 
@@ -37,6 +41,7 @@ class Settings(BaseSettings):
 
     # RAG 配置
     rag_top_k: int = 3
+    knowledge_min_relevance_score: float = 0.3
     rag_model: str = "qwen-max"  # 使用快速响应模型，不带扩展思考
     supervisor_model: str = "qwen-max"
     specialist_model: str = "qwen-max"
@@ -63,8 +68,11 @@ class Settings(BaseSettings):
     supervisor_max_rounds: int = 4
     task_max_steps: int = 8
     reviewer_max_retries: int = 1
+    agent_timeout_seconds: float = 90.0
     tool_timeout_seconds: float = 15.0
     tool_max_retries: int = 3
+    data_max_tool_calls: int = 4
+    tool_result_max_chars: int = 4000
     graph_recursion_limit: int = 50
 
     # Prometheus

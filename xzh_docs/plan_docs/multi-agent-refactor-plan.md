@@ -2,12 +2,14 @@
 
 > 基于当前 `Oncall_agent` Python 项目的渐进式改造方案  
 > 目标架构：Supervisor-Specialist Multi-Agent + LangGraph Custom Workflow + RAG + MCP + Reviewer 质量闭环  
-> 文档状态：实施前设计稿  
+> 文档状态：渐进实施中的架构路线图
 > 适用目标：Agent 应用开发岗位的项目建设、演示与面试讲解
 
-> 实施进度（2026-08-23）：M1（阶段 0～1）已完成并通过离线测试、Ruff 和 Mypy
-> 验收。实际变更与限制见
-> `xzh_docs/handoff_docs/2026-08-23-m1-implementation-handoff.md`。M2 及后续能力仍为计划中。
+> 实施进度（2026-08-23）：M1（阶段 0～1）、M2（阶段 2～4）与 M3（阶段 5～6）
+> 已完成并通过离线测试、Ruff 和 Mypy 验收。实际变更与限制见
+> `xzh_docs/handoff_docs/2026-08-23-m1-implementation-handoff.md` 与
+> `xzh_docs/handoff_docs/2026-08-23-m2-implementation-handoff.md`、
+> `xzh_docs/handoff_docs/2026-08-23-m3-implementation-handoff.md`。M4 及后续能力仍为计划中。
 
 ## 1. 改造结论
 
@@ -771,6 +773,8 @@ DELETE /api/agent/threads/{thread_id}
 
 ### 阶段 5：实现 Supervisor 与顶层图
 
+> 实施状态（2026-08-23）：已完成，验收证据见 M3 交接文档。
+
 **目标：** 形成真实 Multi-Agent 主链路。
 
 **任务：**
@@ -789,6 +793,8 @@ DELETE /api/agent/threads/{thread_id}
 - 任一 Specialist 失败不会造成无限循环。
 
 ### 阶段 6：增加 Reviewer 质量闭环
+
+> 实施状态（2026-08-23）：已完成，验收证据见 M3 交接文档。
 
 **目标：** 对复杂回答增加可控的质量检查。
 

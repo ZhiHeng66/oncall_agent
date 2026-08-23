@@ -20,6 +20,7 @@ class DashScopeEmbeddings(Embeddings):
         api_key: str,
         model: str = "text-embedding-v4",
         dimensions: int = 1024,
+        base_url: str = config.dashscope_base_url,
     ):
         """
         初始化 DashScope Embeddings
@@ -29,28 +30,19 @@ class DashScopeEmbeddings(Embeddings):
             model: 嵌入模型名称
             dimensions: 向量维度
         """
-        if not api_key or api_key == "your-api-key-here":
-            raise ValueError("请设置环境变量 DASHSCOPE_API_KEY")
-
-        self.client = OpenAI(
-            api_key=api_key, base_url="https://dashscope.aliyuncs.com/compatible-mode/v1"
-        )
+        self._api_key = api_key
+        self._base_url = base_url
+        self._client: OpenAI | None = None
         self.model = model
         self.dimensions = dimensions
+        logger.info(f"DashScope Embeddings 已配置 - 模型: {model}, 维度: {dimensions}")
 
-        # 打印初始化信息
-        masked_key = self._mask_api_key(api_key)
-        logger.info(
-            f"DashScope Embeddings 初始化完成 - "
-            f"模型: {model}, 维度: {dimensions}, API Key: {masked_key}"
-        )
-
-    @staticmethod
-    def _mask_api_key(api_key: str) -> str:
-        """掩码 API Key 用于日志"""
-        if len(api_key) > 8:
-            return f"{api_key[:8]}...{api_key[-4:]}"
-        return "***"
+    def _get_client(self) -> OpenAI:
+        if self._client is None:
+            if not self._api_key or self._api_key == "your-api-key-here":
+                raise ValueError("请设置环境变量 DASHSCOPE_API_KEY")
+            self._client = OpenAI(api_key=self._api_key, base_url=self._base_url)
+        return self._client
 
     def embed_documents(self, texts: list[str]) -> list[list[float]]:
         """
@@ -69,7 +61,7 @@ class DashScopeEmbeddings(Embeddings):
             logger.info(f"批量嵌入 {len(texts)} 个文档")
 
             # 批量调用 API
-            response = self.client.embeddings.create(
+            response = self._get_client().embeddings.create(
                 model=self.model, input=texts, dimensions=self.dimensions, encoding_format="float"
             )
 
@@ -98,7 +90,7 @@ class DashScopeEmbeddings(Embeddings):
         try:
             logger.debug(f"嵌入查询, 长度: {len(text)} 字符")
 
-            response = self.client.embeddings.create(
+            response = self._get_client().embeddings.create(
                 model=self.model, input=text, dimensions=self.dimensions, encoding_format="float"
             )
 

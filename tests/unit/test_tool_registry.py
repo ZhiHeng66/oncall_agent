@@ -51,10 +51,27 @@ async def test_registry_enforces_agent_tool_permissions() -> None:
     knowledge_tools = await registry.get_tools_for_agent("knowledge")
     data_tools = await registry.get_tools_for_agent("data")
     supervisor_tools = await registry.get_tools_for_agent("supervisor")
+    reviewer_tools = await registry.get_tools_for_agent("reviewer")
 
     assert [item.name for item in knowledge_tools] == ["knowledge_lookup"]
     assert [item.name for item in data_tools] == ["external_lookup"]
     assert supervisor_tools == []
+    assert reviewer_tools == []
+
+
+async def test_default_registry_isolates_knowledge_and_data_tools() -> None:
+    from app.tools.registry import create_default_tool_registry
+
+    registry = create_default_tool_registry(mcp_provider=FakeProvider([]))  # type: ignore[arg-type]
+
+    knowledge_names = {item.name for item in await registry.get_tools_for_agent("knowledge")}
+    data_names = {item.name for item in await registry.get_tools_for_agent("data")}
+    task_tools = await registry.get_tools_for_agent("task")
+
+    assert knowledge_names == {"retrieve_knowledge"}
+    assert "retrieve_knowledge" not in data_names
+    assert data_names == {"get_current_time", "query_prometheus_alerts"}
+    assert task_tools == []
 
 
 @pytest.mark.asyncio
