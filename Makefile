@@ -1,4 +1,4 @@
-# SuperBizAgent Python 版本 Makefile
+# 企业知识服务多智能体协同平台 Makefile
 # 用于自动化项目初始化、Docker 管理和文档向量化
 
 # ============================================================
@@ -7,7 +7,7 @@
 SERVER_URL = http://localhost:9900
 UPLOAD_API = $(SERVER_URL)/api/upload
 HEALTH_CHECK_API = $(SERVER_URL)/health
-DOCS_DIR = aiops-docs
+DOCS_DIR = business-docs
 MILVUS_CONTAINER = milvus-standalone
 PYTHON ?= .venv/bin/python
 
@@ -20,16 +20,17 @@ NC = \033[0m
 
 .PHONY: help init start stop restart check upload clean up down status wait \
         install install-dev dev run test test-quick format lint fix type-check \
-        security pre-commit-install pre-commit check-all coverage docs shell \
+        security pre-commit-install pre-commit check-all coverage eval docs shell \
         ipython watch add add-dev remove list-docs test-upload sync logs \
-        start-cls stop-cls start-monitor stop-monitor start-api stop-api status-mcp
+        start-cls stop-cls start-monitor stop-monitor start-ticket stop-ticket \
+        start-api stop-api status-mcp
 
 # ============================================================
 # 默认目标：显示帮助信息
 # ============================================================
 help:
 	@echo "$(GREEN)═══════════════════════════════════════════════════════$(NC)"
-	@echo "$(GREEN)  SuperBizAgent Python 版本 - Makefile 命令$(NC)"
+	@echo "$(GREEN)  企业知识服务多智能体协同平台 - Makefile 命令$(NC)"
 	@echo "$(GREEN)═══════════════════════════════════════════════════════$(NC)"
 	@echo ""
 	@echo "$(CYAN)【一键操作】$(NC)"
@@ -52,6 +53,8 @@ help:
 	@echo "  $(YELLOW)make stop-cls$(NC)      - 🛑 停止 CLS MCP 服务"
 	@echo "  $(YELLOW)make start-monitor$(NC) - 📊 启动 Monitor MCP 服务"
 	@echo "  $(YELLOW)make stop-monitor$(NC)  - 🛑 停止 Monitor MCP 服务"
+	@echo "  $(YELLOW)make start-ticket$(NC)  - 🎫 启动业务工单 MCP 服务"
+	@echo "  $(YELLOW)make stop-ticket$(NC)   - 🛑 停止业务工单 MCP 服务"
 	@echo "  $(YELLOW)make start-api$(NC)     - 🚀 启动 FastAPI 服务"
 	@echo "  $(YELLOW)make stop-api$(NC)      - 🛑 停止 FastAPI 服务"
 	@echo ""
@@ -76,6 +79,7 @@ help:
 	@echo "  $(YELLOW)make fix$(NC)          - 🔧 自动修复问题"
 	@echo "  $(YELLOW)make test$(NC)         - 🧪 运行测试"
 	@echo "  $(YELLOW)make check-all$(NC)    - ✅ 运行所有检查"
+	@echo "  $(YELLOW)make eval$(NC)         - 📏 运行固定离线评估并生成比较报告"
 	@echo ""
 	@echo "$(CYAN)【其他】$(NC)"
 	@echo "  $(YELLOW)make clean$(NC)        - 🧹 清理临时文件"
@@ -96,7 +100,7 @@ help:
 # ============================================================
 init:
 	@echo "$(GREEN)═══════════════════════════════════════════════════════$(NC)"
-	@echo "$(GREEN)🚀 开始一键初始化 SuperBizAgent...$(NC)"
+	@echo "$(GREEN)🚀 开始初始化企业知识服务多智能体协同平台...$(NC)"
 	@echo "$(GREEN)═══════════════════════════════════════════════════════$(NC)"
 	@echo ""
 	@echo "$(YELLOW)步骤 1/4: 启动 Docker 容器（Milvus 向量数据库）$(NC)"
@@ -232,6 +236,29 @@ start-monitor:
 		fi; \
 	fi
 
+start-ticket:
+	@echo "$(YELLOW)🎫 启动业务工单 MCP 服务...$(NC)"
+	@if pgrep -f "mcp_servers/ticket_server.py" > /dev/null 2>&1; then \
+		echo "$(GREEN)✅ 业务工单 MCP 服务已经在运行中$(NC)"; \
+	else \
+		nohup .venv/bin/python mcp_servers/ticket_server.py > mcp_ticket.log 2>&1 & \
+		echo $$! > mcp_ticket.pid; \
+		sleep 2; \
+		pgrep -f "mcp_servers/ticket_server.py" > /dev/null 2>&1 && \
+			echo "$(GREEN)✅ 业务工单 MCP 服务启动成功（http://127.0.0.1:8005/mcp）$(NC)" || \
+			echo "$(RED)❌ 业务工单 MCP 服务启动失败，请检查 mcp_ticket.log$(NC)"; \
+	fi
+
+stop-ticket:
+	@echo "$(YELLOW)🛑 停止业务工单 MCP 服务...$(NC)"
+	@if [ -f mcp_ticket.pid ]; then \
+		pid=$$(cat mcp_ticket.pid); \
+		kill $$pid 2>/dev/null || true; \
+		rm -f mcp_ticket.pid; \
+	else \
+		pkill -f "mcp_servers/ticket_server.py" 2>/dev/null || true; \
+	fi
+
 # 停止 Monitor MCP 服务
 stop-monitor:
 	@echo "$(YELLOW)🛑 停止 Monitor MCP 服务...$(NC)"
@@ -281,6 +308,14 @@ status-mcp:
 		echo "  状态: $(RED)未运行$(NC)"; \
 	fi
 	@echo ""
+	@echo "$(CYAN)Business Ticket MCP 服务:$(NC)"
+	@if pgrep -f "mcp_servers/ticket_server.py" > /dev/null 2>&1; then \
+		echo "  状态: $(GREEN)运行中$(NC)"; \
+		echo "  URL: http://127.0.0.1:8005/mcp"; \
+	else \
+		echo "  状态: $(RED)未运行$(NC)"; \
+	fi
+	@echo ""
 	@echo "$(CYAN)Math MCP 服务:$(NC)"
 	@echo "  状态: $(YELLOW)已移除（示例服务）$(NC)"
 
@@ -298,6 +333,9 @@ start:
 	@sleep 1
 	@echo ""
 	@$(MAKE) start-monitor
+	@sleep 1
+	@echo ""
+	@$(MAKE) start-ticket
 	@sleep 1
 	@echo ""
 	@$(MAKE) start-api
@@ -332,6 +370,8 @@ stop:
 	@$(MAKE) stop-cls
 	@echo ""
 	@$(MAKE) stop-monitor
+	@echo ""
+	@$(MAKE) stop-ticket
 	@echo ""
 	@echo "$(GREEN)═══════════════════════════════════════════════════════$(NC)"
 	@echo "$(GREEN)✅ 所有服务已停止！$(NC)"
@@ -566,6 +606,12 @@ test-quick:  ## 快速测试
 	@echo "$(YELLOW)⚡ 快速测试...$(NC)"
 	$(PYTHON) -m pytest tests/ -v
 
+eval:  ## 运行不依赖外部服务的固定 Multi-Agent Eval
+	ONCALL_DISABLE_ENV_FILE=1 $(PYTHON) -m app.evaluation.runner \
+		--baseline xzh_docs/eval_reports/m5_baseline.json \
+		--label m5_acceptance \
+		--output artifacts/evals/latest.json
+
 check-all:  ## 运行所有检查
 	@echo "$(YELLOW)🚀 运行所有检查...$(NC)"
 	@$(MAKE) format
@@ -605,6 +651,7 @@ clean:  ## 清理临时文件
 	rm -f server.pid server.log
 	rm -f mcp_cls.pid mcp_cls.log
 	rm -f mcp_monitor.pid mcp_monitor.log
+	rm -f mcp_ticket.pid mcp_ticket.log
 	rm -rf uploads/*.tmp 2>/dev/null || true
 	@echo "$(GREEN)✅ 清理完成$(NC)"
 

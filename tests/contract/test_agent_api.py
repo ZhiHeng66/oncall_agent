@@ -83,6 +83,8 @@ def test_unified_json_run_and_lookup_contract(monkeypatch: Any) -> None:
     )
     payload = response.json()
     lookup = client.get(f"/api/agent/runs/{payload['run_id']}")
+    trace = client.get(f"/api/agent/runs/{payload['run_id']}/trace")
+    metrics = client.get("/api/agent/metrics")
 
     assert response.status_code == 200
     assert payload["status"] == "completed"
@@ -90,6 +92,9 @@ def test_unified_json_run_and_lookup_contract(monkeypatch: Any) -> None:
     assert payload["answer"]
     assert payload["sources"] == []
     assert lookup.json() == payload
+    assert trace.json()["run"] == payload
+    assert trace.json()["events"][-1]["type"] == "run_completed"
+    assert metrics.json()["total_runs"] == 1
 
 
 def test_unified_sse_envelope_and_single_terminal_contract(monkeypatch: Any) -> None:
@@ -157,7 +162,12 @@ def test_main_application_registers_new_and_compatibility_routes() -> None:
 
     paths = {route.path for route in app.routes}
 
-    assert {"/api/agent/run", "/api/agent/run_stream"} <= paths
+    assert {
+        "/api/agent/run",
+        "/api/agent/run_stream",
+        "/api/agent/runs/{run_id}/trace",
+        "/api/agent/metrics",
+    } <= paths
     assert {"/api/chat", "/api/chat_stream", "/api/aiops"} <= paths
     aiops_route = next(route for route in app.routes if route.path == "/api/aiops")
     assert aiops_route.deprecated is True

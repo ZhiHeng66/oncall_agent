@@ -22,8 +22,8 @@ class Settings(BaseSettings):
     )
 
     # 应用配置
-    app_name: str = "SuperBizAgent"
-    app_version: str = "1.0.0"
+    app_name: str = "Enterprise Knowledge Multi-Agent Platform"
+    app_version: str = "2.0.0"
     debug: bool = False
     host: str = "0.0.0.0"
     port: int = 9900
@@ -61,10 +61,13 @@ class Settings(BaseSettings):
     mcp_cls_url: str = "http://localhost:8003/mcp"
     mcp_monitor_transport: str = "streamable-http"
     mcp_monitor_url: str = "http://localhost:8004/mcp"
+    mcp_ticket_transport: str = "streamable-http"
+    mcp_ticket_url: str = "http://localhost:8005/mcp"
     mcp_tool_cache_ttl_seconds: float = 300.0
 
     # Agent 运行限制
-    checkpointer_backend: str = "memory"
+    checkpointer_backend: str = "sqlite"
+    checkpoint_path: str = "data/multi_agent.sqlite3"
     supervisor_max_rounds: int = 4
     task_max_steps: int = 8
     reviewer_max_retries: int = 1
@@ -93,6 +96,10 @@ class Settings(BaseSettings):
             "monitor": {
                 "transport": self.mcp_monitor_transport,
                 "url": self.mcp_monitor_url,
+            },
+            "ticket": {
+                "transport": self.mcp_ticket_transport,
+                "url": self.mcp_ticket_url,
             },
         }
 

@@ -14,6 +14,9 @@
 - **Task Agent**：使用有限 Plan-Execute-Replan 子图执行有依赖的复杂任务。
 - **Reviewer Agent**：检查证据、引用和错误披露，最多定向返工一次。
 - **统一 API 与 SSE**：提供 JSON 响应、Agent 时间线、来源和明确终态。
+- **本地持久化与追踪**：SQLite Checkpointer 支持进程重启恢复，可按 `run_id` 查询安全 trace 和运行指标。
+- **固定离线 Eval**：34 条用例覆盖路由、检索引用契约、工具计划校验、任务终态和 Reviewer；`make eval` 可重复生成同数据集比较报告。
+- **业务演示数据**：产品手册、业务规则、FAQ、交付指南，以及只读工单 MCP 数据源。
 - **兼容接口**：迁移期保留 `/api/chat`、`/api/chat_stream` 和 `/api/aiops`。
 
 ## 🛠️ 技术栈
@@ -36,7 +39,7 @@
 ```bash
 # 1. 克隆项目
 git clone <repository_url>
-cd super_biz_agent_py
+cd Oncall_agent
 
 # 2. 安装依赖（推荐使用 uv）
 # 方式 1: 使用 uv（推荐，更快）
@@ -66,7 +69,7 @@ make start
 ```powershell
 # 1. 克隆项目
 git clone <repository_url>
-cd super_biz_agent_py
+cd Oncall_agent
 
 # 2. 创建虚拟环境并安装依赖
 # 方式 1: 使用 uv（推荐，更快）
@@ -103,6 +106,9 @@ python mcp_servers/cls_server.py
 # 启动 Monitor 监控服务（新开一个 PowerShell 窗口）
 python mcp_servers/monitor_server.py
 
+# 启动只读业务工单服务
+python mcp_servers/ticket_server.py
+
 # 8. 启动 FastAPI 主服务（新开一个 PowerShell 窗口）
 # 注意：日志会自动输出到 logs\app_YYYY-MM-DD.log
 python -m uvicorn app.main:app --host 0.0.0.0 --port 9900
@@ -110,7 +116,7 @@ python -m uvicorn app.main:app --host 0.0.0.0 --port 9900
 # 9. 上传文档到向量库（新开一个 PowerShell 窗口）
 # 等待服务启动完成后执行
 timeout /t 5
-python -c "import requests, os, time; [requests.post('http://localhost:9900/api/upload', files={'file': open(f'aiops-docs/{f}', 'rb')}) or time.sleep(1) for f in os.listdir('aiops-docs') if f.endswith('.md')]"
+# 可逐个将 business-docs/ 下的 Markdown 上传至 /api/upload
 ```
 
 **Windows 一键启动脚本**（推荐）
@@ -137,14 +143,16 @@ python -c "import requests, os, time; [requests.post('http://localhost:9900/api/
 |------|------|------|------|
 | 统一 Agent 执行 | POST | `/api/agent/run` | Supervisor 自动路由并返回结构化结果 |
 | 统一 Agent 流 | POST | `/api/agent/run_stream` | 统一 SSE envelope 和执行时间线 |
-| 查询运行 | GET | `/api/agent/runs/{run_id}` | 查询当前进程内已完成运行 |
-| 查询线程 | GET | `/api/agent/threads/{thread_id}` | 查询当前进程内运行和可见消息 |
-| 清理线程 | DELETE | `/api/agent/threads/{thread_id}` | 清理当前进程内线程状态 |
+| 查询运行 | GET | `/api/agent/runs/{run_id}` | 查询已完成运行 |
+| 查询 Trace | GET | `/api/agent/runs/{run_id}/trace` | 查询 Agent、工具事件与单次运行指标 |
+| 聚合指标 | GET | `/api/agent/metrics` | 失败率、超时率、平均耗时、调度/工具/步骤数 |
+| 查询线程 | GET | `/api/agent/threads/{thread_id}` | 查询持久化运行和用户可见消息 |
+| 清理线程 | DELETE | `/api/agent/threads/{thread_id}` | 清理线程运行记录和图 Checkpoint |
 | 旧普通对话 | POST | `/api/chat` | 兼容适配到统一 Agent Service |
 | 旧流式对话 | POST | `/api/chat_stream` | 兼容旧 content/done 事件 |
 | AIOps 兼容入口 | POST | `/api/aiops` | 已标记 deprecated，暂用 Task Agent |
 | 文件上传 | POST | `/api/upload` | 上传并索引文档 |
-| 健康检查 | GET | `/api/health` | 服务状态检查 |
+| 健康检查 | GET | `/health` | 服务状态检查 |
 
 ### 使用示例
 
@@ -164,19 +172,26 @@ curl -X POST "http://localhost:9900/api/agent/run_stream" \
 curl -X POST "http://localhost:9900/api/chat" \
   -H "Content-Type: application/json" \
   -d '{"Id":"thread-001","Question":"你好"}'
+
+# 按 run_id 还原安全执行链路
+curl "http://localhost:9900/api/agent/runs/<run_id>/trace"
+
+# 查看运行聚合指标
+curl "http://localhost:9900/api/agent/metrics"
 ```
 
 统一 SSE 事件至少包含 `event_id`、`run_id`、`thread_id`、`type`、`timestamp`
 和 `data`。每个流只产生一个 `run_completed` 或 `run_failed` 终态事件。浏览器断开后，
 服务会关闭对应异步事件生成器，不再继续向该客户端生成事件。
 
-运行和线程查询当前保存在开发环境 `MemorySaver`/进程内存中，服务重启后不会恢复，
-不能视为持久化存储。
+默认使用 `data/multi_agent.sqlite3` 保存 LangGraph Checkpoint、运行索引和安全事件。它适合本地
+演示与单实例重启恢复，不代表多实例生产级持久化。未获得可靠 provider usage 与计价信息时，
+模型调用数、Token 数和 Token 成本返回 `null`，不会伪装为 0。
 
 ## 📁 项目结构
 
 ```
-super_biz_agent_py/
+Oncall_agent/
 ├── app/                                    # 应用核心
 │   ├── __init__.py                         # 包初始化（自动加载日志配置）
 │   ├── main.py                             # FastAPI 应用入口
@@ -191,6 +206,7 @@ super_biz_agent_py/
 │   ├── services/                           # 业务服务层
 │   │   ├── __init__.py
 │   │   ├── multi_agent_service.py          # 统一执行、事件与运行查询
+│   │   ├── run_store.py                    # SQLite/内存运行、线程和 Trace 存储
 │   │   ├── event_service.py                # 安全 SSE 事件信封
 │   │   ├── rag_agent_service.py            # 旧 RAG 服务（兼容期保留）
 │   │   ├── aiops_service.py                # 旧 AIOps 到 Task Agent 的适配
@@ -234,8 +250,11 @@ super_biz_agent_py/
 ├── mcp_servers/                            # MCP 服务器
 │   ├── cls_server.py                       # CLS 日志查询服务
 │   ├── monitor_server.py                   # 监控数据服务
+│   ├── ticket_server.py                    # 只读脱敏业务工单服务
 │   └── README.md                           # MCP 服务说明
 ├── aiops-docs/                             # 运维知识库（Markdown 文档）
+├── business-docs/                          # 产品、规则、FAQ 和交付知识库
+├── tests/evals/                            # 固定离线 Eval 数据集和测试
 ├── logs/                                   # 日志目录（Loguru 自动创建）
 │   └── app_YYYY-MM-DD.log                  # 按天轮转的日志文件
 ├── uploads/                                # 上传文件临时目录
@@ -270,6 +289,13 @@ MILVUS_PORT=19530
 RAG_TOP_K=3
 CHUNK_MAX_SIZE=800
 CHUNK_OVERLAP=100
+
+# 本地持久化（默认值）
+CHECKPOINTER_BACKEND=sqlite
+CHECKPOINT_PATH=data/multi_agent.sqlite3
+
+# 非运维业务 MCP 示例
+MCP_TICKET_URL=http://localhost:8005/mcp
 ```
 
 ## 旧 AIOps 兼容入口
@@ -311,6 +337,9 @@ make down              # 停止 Docker 容器
 # 代码质量
 make format            # 格式化代码
 make lint              # 代码检查
+make type-check         # 类型检查
+make test-quick         # 全部自动化测试
+make eval               # 固定数据集评估，报告写入 artifacts/evals/latest.json
 ```
 
 
@@ -352,9 +381,8 @@ taskkill /F /PID <PID>
 
 ### API Key 错误
 ```bash
-# 检查环境变量
-cat .env | grep DASHSCOPE_API_KEY    # Linux/macOS
-type .env | findstr DASHSCOPE_API_KEY  # Windows
+# 仅检查变量是否已设置，不打印密钥内容
+python -c "import os; print(bool(os.getenv('DASHSCOPE_API_KEY')))"
 ```
 
 ### Milvus 连接失败
@@ -379,11 +407,13 @@ docker compose -f vector-database.yml restart standalone
 tail -f logs/app_$(date +%Y-%m-%d).log  # FastAPI 主服务（Loguru 日志）
 tail -f mcp_cls.log                      # CLS MCP 服务
 tail -f mcp_monitor.log                  # Monitor MCP 服务
+tail -f mcp_ticket.log                   # Business Ticket MCP 服务
 
 # 检查端口占用
 lsof -i :9900  # FastAPI
 lsof -i :8003  # CLS MCP
 lsof -i :8004  # Monitor MCP
+lsof -i :8005  # Business Ticket MCP
 ```
 
 **Windows:**

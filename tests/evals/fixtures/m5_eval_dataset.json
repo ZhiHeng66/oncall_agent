@@ -1,0 +1,43 @@
+{
+  "version": "m5-v1",
+  "cases": [
+    {"id":"route-01","kind":"route","query":"你好","expected":{"mode":"direct","agents":[]}},
+    {"id":"route-02","kind":"route","query":"查询产品手册","expected":{"mode":"single","agents":["knowledge"]}},
+    {"id":"route-03","kind":"route","query":"公司退款制度是什么","expected":{"mode":"single","agents":["knowledge"]}},
+    {"id":"route-04","kind":"route","query":"查询当前工单数据","expected":{"mode":"single","agents":["data"]}},
+    {"id":"route-05","kind":"route","query":"查看实时指标","expected":{"mode":"single","agents":["data"]}},
+    {"id":"route-06","kind":"route","query":"结合知识库和当前数据回答","expected":{"mode":"parallel","agents":["knowledge","data"]}},
+    {"id":"route-07","kind":"route","query":"对照产品文档和实时工单","expected":{"mode":"parallel","agents":["knowledge","data"]}},
+    {"id":"route-08","kind":"route","query":"先查制度再制定方案","expected":{"mode":"complex","agents":["task"]}},
+    {"id":"route-09","kind":"route","query":"请分步骤处理交付问题","expected":{"mode":"complex","agents":["task"]}},
+    {"id":"route-10","kind":"route","query":"综合分析客户问题","expected":{"mode":"complex","agents":["task"]}},
+
+    {"id":"retrieval-01","kind":"retrieval","answer":"退款期为 7 天 [来源1]","evidence_count":1,"expected":true},
+    {"id":"retrieval-02","kind":"retrieval","answer":"见产品说明 [来源2]","evidence_count":2,"expected":true},
+    {"id":"retrieval-03","kind":"retrieval","answer":"无引用结论","evidence_count":1,"expected":false},
+    {"id":"retrieval-04","kind":"retrieval","answer":"越界引用 [来源3]","evidence_count":2,"expected":false},
+    {"id":"retrieval-05","kind":"retrieval","answer":"没有证据 [来源1]","evidence_count":0,"expected":false},
+    {"id":"retrieval-06","kind":"retrieval","answer":"多个依据 [来源1][来源2]","evidence_count":2,"expected":true},
+
+    {"id":"tool-01","kind":"tool_choice","allowed_tools":["get_ticket","search_tickets"],"proposed_tools":["get_ticket"],"max_calls":4,"expected":["get_ticket"]},
+    {"id":"tool-02","kind":"tool_choice","allowed_tools":["get_current_time"],"proposed_tools":["delete_ticket"],"max_calls":4,"expected":[]},
+    {"id":"tool-03","kind":"tool_choice","allowed_tools":["get_ticket"],"proposed_tools":["get_ticket","delete_ticket"],"max_calls":4,"expected":["get_ticket"]},
+    {"id":"tool-04","kind":"tool_choice","allowed_tools":["a","b","c"],"proposed_tools":["a","b","c"],"max_calls":2,"expected":["a","b"]},
+    {"id":"tool-05","kind":"tool_choice","allowed_tools":["query_metrics"],"proposed_tools":[],"max_calls":4,"expected":[]},
+    {"id":"tool-06","kind":"tool_choice","allowed_tools":["search_tickets"],"proposed_tools":["search_tickets"],"max_calls":1,"expected":["search_tickets"]},
+
+    {"id":"task-01","kind":"task_completion","statuses":["success"],"expected":"completed"},
+    {"id":"task-02","kind":"task_completion","statuses":["success","success"],"expected":"completed"},
+    {"id":"task-03","kind":"task_completion","statuses":["success","partial"],"expected":"partial"},
+    {"id":"task-04","kind":"task_completion","statuses":["success","failed"],"expected":"partial"},
+    {"id":"task-05","kind":"task_completion","statuses":["failed"],"expected":"failed"},
+    {"id":"task-06","kind":"task_completion","statuses":["failed","failed"],"expected":"failed"},
+
+    {"id":"review-01","kind":"reviewer","answer":"成功率为 90%","evidence_count":0,"errors":[],"expected":"knowledge"},
+    {"id":"review-02","kind":"reviewer","answer":"费用为 100 元","evidence_count":0,"errors":[],"expected":"knowledge"},
+    {"id":"review-03","kind":"reviewer","answer":"知识结论没有引用","evidence_count":1,"errors":[],"expected":"knowledge"},
+    {"id":"review-04","kind":"reviewer","answer":"错误引用 [来源2]","evidence_count":1,"errors":[],"expected":"knowledge"},
+    {"id":"review-05","kind":"reviewer","answer":"查询完成","evidence_count":0,"errors":["工具调用失败"],"expected":"supervisor"},
+    {"id":"review-06","kind":"reviewer","answer":"部分未完成：工具调用失败","evidence_count":0,"errors":["工具调用失败"],"expected":"none"}
+  ]
+}

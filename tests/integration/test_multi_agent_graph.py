@@ -86,6 +86,11 @@ class TimelineTaskAgent(FakeTaskAgent):
         yield {"type": "plan_created", "plan": ["collect"]}
         yield {"type": "step_started", "step": "collect", "step_index": 1}
         yield {
+            "type": "tool_started",
+            "agent": "data",
+            "data": {"tool_name": "get_ticket", "server_name": "ticket"},
+        }
+        yield {
             "type": "step_completed",
             "step": "collect",
             "step_index": 1,
@@ -120,6 +125,19 @@ class SequenceReviewer:
         return result
 
 
+class PassThroughFinalResponse:
+    def __init__(self) -> None:
+        self.calls = 0
+
+    async def generate(self, user_query, candidate_answer, *, event_sink=None):
+        self.calls += 1
+        if event_sink is not None:
+            midpoint = max(1, len(candidate_answer) // 2)
+            event_sink(candidate_answer[:midpoint])
+            event_sink(candidate_answer[midpoint:])
+        return candidate_answer
+
+
 class ConcurrentAgent(FakeAgent):
     def __init__(self, name: str, shared: dict[str, object]) -> None:
         super().__init__(name)
@@ -151,6 +169,7 @@ def graph_for(
     data=None,
     task=None,
     reviewer=None,
+    final_response=None,
     runtime_limits=None,
 ) -> MultiAgentGraph:
     return MultiAgentGraph(
@@ -159,6 +178,7 @@ def graph_for(
         data=data or FakeAgent("data"),
         task=task or FakeTaskAgent("task"),
         reviewer=reviewer or NoopReviewer(),
+        final_response=final_response or PassThroughFinalResponse(),
         limits=runtime_limits or limits(),
     )
 
@@ -342,6 +362,7 @@ async def test_unexpected_graph_failure_returns_clean_failed_terminal() -> None:
         data=FakeAgent("data"),
         task=FakeTaskAgent("task"),
         reviewer=NoopReviewer(),
+        final_response=PassThroughFinalResponse(),
         limits=limits(),
     )
 
@@ -374,10 +395,55 @@ async def test_top_level_stream_propagates_task_timeline_and_one_graph_terminal(
         "agent_started",
         "plan_created",
         "step_started",
+        "tool_started",
         "step_completed",
         "agent_completed",
         "review_completed",
+        "final_content_delta",
+        "final_content_delta",
         "graph_completed",
     ]
     assert sum(event["type"] == "graph_completed" for event in events) == 1
+    tool_event = next(event for event in events if event["type"] == "tool_started")
+    assert tool_event["agent"] == "data"
+    assert tool_event["data"]["tool_name"] == "get_ticket"
     assert events[-1]["result"]["status"] == "completed"
+
+
+def test_aggregate_rewrites_local_citations_to_global_source_numbers() -> None:
+    first = Evidence(
+        source_type="knowledge",
+        source_name="delivery-guide.md",
+        source_id="delivery",
+        content="delivery",
+    )
+    second = Evidence(
+        source_type="knowledge",
+        source_name="service-levels.md",
+        source_id="sla",
+        content="sla",
+    )
+    results = [
+        AgentResult(
+            agent_name="task",
+            task_id="task-1",
+            status="partial",
+            summary="交付规则 [来源1]",
+            evidence=[first],
+        ),
+        AgentResult(
+            agent_name="knowledge",
+            task_id="retry-knowledge",
+            status="success",
+            summary="服务等级 [来源1]",
+            evidence=[second],
+        ),
+    ]
+    indexes = MultiAgentGraph._evidence_indexes(results)
+
+    assert MultiAgentGraph._rewrite_citations(results[0].summary, results[0].evidence, indexes) == (
+        "交付规则 [来源1]"
+    )
+    assert MultiAgentGraph._rewrite_citations(results[1].summary, results[1].evidence, indexes) == (
+        "服务等级 [来源2]"
+    )

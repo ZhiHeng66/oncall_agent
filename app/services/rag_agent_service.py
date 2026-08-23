@@ -96,7 +96,7 @@ class RagAgentService:
         self.tools: list = []
 
         # 创建内存检查点（用于会话管理）
-        self.checkpointer = checkpointer_factory.create()
+        self.checkpointer = checkpointer_factory.create_memory()
 
         # Agent 初始化（会在异步方法中完成）
         self.agent = None

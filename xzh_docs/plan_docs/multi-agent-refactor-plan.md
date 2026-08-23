@@ -10,7 +10,7 @@
 > `xzh_docs/handoff_docs/2026-08-23-m1-implementation-handoff.md` 与
 > `xzh_docs/handoff_docs/2026-08-23-m2-implementation-handoff.md`、
 > `xzh_docs/handoff_docs/2026-08-23-m3-implementation-handoff.md`、
-> `xzh_docs/handoff_docs/2026-08-23-m4-implementation-handoff.md`。M5 仍为计划中。
+> `xzh_docs/handoff_docs/2026-08-23-m5-implementation-handoff.md`。M1～M5 已按当前验收范围实现；生产级多实例持久化和在线质量评估仍属于后续增强。
 
 ## 1. 改造结论
 

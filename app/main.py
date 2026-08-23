@@ -16,6 +16,7 @@ from app.agent.mcp_client import sanitize_error_message
 from app.api import agent, aiops, chat, file, health
 from app.config import config
 from app.core.milvus_client import milvus_manager
+from app.services.multi_agent_service import multi_agent_service
 from app.tools.registry import tool_registry
 
 
@@ -28,6 +29,8 @@ async def lifespan(app: FastAPI):
     logger.info(f"📝 环境: {'开发' if config.debug else '生产'}")
     logger.info(f"🌐 监听地址: http://{config.host}:{config.port}")
     logger.info(f"📚 API 文档: http://{config.host}:{config.port}/docs")
+
+    await multi_agent_service.startup()
 
     # 连接 Milvus
     logger.info("🔌 正在连接 Milvus...")
@@ -45,6 +48,7 @@ async def lifespan(app: FastAPI):
     yield
 
     # 关闭时执行
+    await multi_agent_service.shutdown()
     logger.info("🔌 正在关闭 Milvus 连接...")
     milvus_manager.close()
     logger.info(f"👋 {config.app_name} 关闭")

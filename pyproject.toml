@@ -1,7 +1,7 @@
 [project]
-name = "super-biz-agent-py"
-version = "1.2.1"
-description = "基于 LangChain 的智能业务代理系统 - 支持 RAG 知识库和 AIOps 智能运维"
+name = "enterprise-knowledge-multi-agent"
+version = "2.0.0"
+description = "基于 LangGraph、RAG 与 MCP 的企业知识服务多智能体协同平台"
 authors = [{name = "chief"}]
 readme = "README.md"
 requires-python = ">=3.11,<3.14"
@@ -30,6 +30,7 @@ dependencies = [
     "langchain-mcp-adapters>=0.2.1",
     "fastmcp>=2.14.0",
     "langchain-qwq>=0.3.4",
+    "langgraph-checkpoint-sqlite>=3.0.0",
 ]
 
 [project.optional-dependencies]

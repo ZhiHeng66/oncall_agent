@@ -1,6 +1,6 @@
 # MCP Servers
 
-为 AIOps 智能诊断提供日志查询和监控数据工具。
+为 Data Agent 提供只读外部数据能力。日志和监控服务用于兼容演示，业务工单服务用于非运维场景。
 
 ## 📚 服务列表
 
@@ -24,6 +24,13 @@
 - `search_historical_tickets` - 历史工单查询
 - `get_service_info` / `list_all_services` - 服务信息
 
+### Business Ticket Server (`ticket_server.py`)
+**脱敏业务工单查询** - 端口 8005
+
+**核心工具：**
+- `get_ticket` - 按编号查询工单
+- `search_tickets` - 按状态和产品筛选工单，硬限制最多 20 条
+
 ## 🚀 快速开始
 
 ### 安装依赖
@@ -35,15 +42,16 @@ pip install fastmcp
 
 **方式一：使用 Makefile（推荐）**
 ```bash
-make mcp-start   # 启动所有 MCP 服务
-make mcp-stop    # 停止所有 MCP 服务
-make mcp-status  # 查看服务状态
+make start       # 启动三个 MCP 服务和 FastAPI
+make stop        # 停止 FastAPI 和三个 MCP 服务
+make status-mcp  # 查看 MCP 服务状态
 ```
 
 **方式二：手动启动**
 ```bash
 python mcp_servers/cls_server.py
 python mcp_servers/monitor_server.py
+python mcp_servers/ticket_server.py
 ```
 
 ## 💡 使用示例

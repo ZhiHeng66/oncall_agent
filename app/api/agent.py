@@ -6,8 +6,10 @@ from fastapi import APIRouter, HTTPException, Request
 from sse_starlette.sse import EventSourceResponse
 
 from app.models.agent import (
+    AgentMetricsResponse,
     AgentRunRequest,
     AgentRunResponse,
+    AgentRunTraceResponse,
     AgentThreadDeleteResponse,
     AgentThreadResponse,
 )
@@ -49,6 +51,19 @@ async def get_run(run_id: str) -> AgentRunResponse:
     if result is None:
         raise HTTPException(status_code=404, detail="Agent run not found")
     return result
+
+
+@router.get("/runs/{run_id}/trace", response_model=AgentRunTraceResponse)
+async def get_run_trace(run_id: str) -> AgentRunTraceResponse:
+    result = await multi_agent_service.get_trace(run_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Agent run not found")
+    return result
+
+
+@router.get("/metrics", response_model=AgentMetricsResponse)
+async def get_metrics() -> AgentMetricsResponse:
+    return await multi_agent_service.get_metrics()
 
 
 @router.get("/threads/{thread_id}", response_model=AgentThreadResponse)

@@ -8,7 +8,7 @@ from langchain_qwq import ChatQwen
 
 from app.config import Settings, config
 
-LLMRole = Literal["chat", "supervisor", "specialist", "task", "reviewer"]
+LLMRole = Literal["chat", "supervisor", "specialist", "task", "reviewer", "finalizer"]
 
 
 class LLMFactory:
@@ -61,6 +61,11 @@ class LLMFactory:
                 self._settings.reviewer_model,
                 self._settings.agent_temperature,
                 False,
+            ),
+            "finalizer": (
+                self._settings.rag_model,
+                self._settings.agent_temperature,
+                True,
             ),
         }
         default_model, default_temperature, default_streaming = profiles[role]

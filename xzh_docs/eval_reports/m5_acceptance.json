@@ -1,0 +1,403 @@
+{
+  "comparison": {
+    "baseline_score": 1.0,
+    "current_score": 1.0,
+    "score_delta": 0.0,
+    "same_dataset": true
+  },
+  "current": {
+    "dataset_version": "m5-v1",
+    "dataset_sha256": "d0e230f96336c68e3ec8557f4c5fd9bf3fa5dec00bf2aad02045b11a3d192c86",
+    "implementation_label": "m5_acceptance",
+    "profile": "offline_contract",
+    "external_services": false,
+    "passed": 34,
+    "total": 34,
+    "score": 1.0,
+    "categories": {
+      "retrieval": {
+        "passed": 6,
+        "total": 6,
+        "score": 1.0
+      },
+      "reviewer": {
+        "passed": 6,
+        "total": 6,
+        "score": 1.0
+      },
+      "route": {
+        "passed": 10,
+        "total": 10,
+        "score": 1.0
+      },
+      "task_completion": {
+        "passed": 6,
+        "total": 6,
+        "score": 1.0
+      },
+      "tool_choice": {
+        "passed": 6,
+        "total": 6,
+        "score": 1.0
+      }
+    },
+    "results": [
+      {
+        "id": "route-01",
+        "kind": "route",
+        "passed": true,
+        "expected": {
+          "mode": "direct",
+          "agents": []
+        },
+        "actual": {
+          "mode": "direct",
+          "agents": []
+        }
+      },
+      {
+        "id": "route-02",
+        "kind": "route",
+        "passed": true,
+        "expected": {
+          "mode": "single",
+          "agents": [
+            "knowledge"
+          ]
+        },
+        "actual": {
+          "mode": "single",
+          "agents": [
+            "knowledge"
+          ]
+        }
+      },
+      {
+        "id": "route-03",
+        "kind": "route",
+        "passed": true,
+        "expected": {
+          "mode": "single",
+          "agents": [
+            "knowledge"
+          ]
+        },
+        "actual": {
+          "mode": "single",
+          "agents": [
+            "knowledge"
+          ]
+        }
+      },
+      {
+        "id": "route-04",
+        "kind": "route",
+        "passed": true,
+        "expected": {
+          "mode": "single",
+          "agents": [
+            "data"
+          ]
+        },
+        "actual": {
+          "mode": "single",
+          "agents": [
+            "data"
+          ]
+        }
+      },
+      {
+        "id": "route-05",
+        "kind": "route",
+        "passed": true,
+        "expected": {
+          "mode": "single",
+          "agents": [
+            "data"
+          ]
+        },
+        "actual": {
+          "mode": "single",
+          "agents": [
+            "data"
+          ]
+        }
+      },
+      {
+        "id": "route-06",
+        "kind": "route",
+        "passed": true,
+        "expected": {
+          "mode": "parallel",
+          "agents": [
+            "knowledge",
+            "data"
+          ]
+        },
+        "actual": {
+          "mode": "parallel",
+          "agents": [
+            "knowledge",
+            "data"
+          ]
+        }
+      },
+      {
+        "id": "route-07",
+        "kind": "route",
+        "passed": true,
+        "expected": {
+          "mode": "parallel",
+          "agents": [
+            "knowledge",
+            "data"
+          ]
+        },
+        "actual": {
+          "mode": "parallel",
+          "agents": [
+            "knowledge",
+            "data"
+          ]
+        }
+      },
+      {
+        "id": "route-08",
+        "kind": "route",
+        "passed": true,
+        "expected": {
+          "mode": "complex",
+          "agents": [
+            "task"
+          ]
+        },
+        "actual": {
+          "mode": "complex",
+          "agents": [
+            "task"
+          ]
+        }
+      },
+      {
+        "id": "route-09",
+        "kind": "route",
+        "passed": true,
+        "expected": {
+          "mode": "complex",
+          "agents": [
+            "task"
+          ]
+        },
+        "actual": {
+          "mode": "complex",
+          "agents": [
+            "task"
+          ]
+        }
+      },
+      {
+        "id": "route-10",
+        "kind": "route",
+        "passed": true,
+        "expected": {
+          "mode": "complex",
+          "agents": [
+            "task"
+          ]
+        },
+        "actual": {
+          "mode": "complex",
+          "agents": [
+            "task"
+          ]
+        }
+      },
+      {
+        "id": "retrieval-01",
+        "kind": "retrieval",
+        "passed": true,
+        "expected": true,
+        "actual": true
+      },
+      {
+        "id": "retrieval-02",
+        "kind": "retrieval",
+        "passed": true,
+        "expected": true,
+        "actual": true
+      },
+      {
+        "id": "retrieval-03",
+        "kind": "retrieval",
+        "passed": true,
+        "expected": false,
+        "actual": false
+      },
+      {
+        "id": "retrieval-04",
+        "kind": "retrieval",
+        "passed": true,
+        "expected": false,
+        "actual": false
+      },
+      {
+        "id": "retrieval-05",
+        "kind": "retrieval",
+        "passed": true,
+        "expected": false,
+        "actual": false
+      },
+      {
+        "id": "retrieval-06",
+        "kind": "retrieval",
+        "passed": true,
+        "expected": true,
+        "actual": true
+      },
+      {
+        "id": "tool-01",
+        "kind": "tool_choice",
+        "passed": true,
+        "expected": [
+          "get_ticket"
+        ],
+        "actual": [
+          "get_ticket"
+        ]
+      },
+      {
+        "id": "tool-02",
+        "kind": "tool_choice",
+        "passed": true,
+        "expected": [],
+        "actual": []
+      },
+      {
+        "id": "tool-03",
+        "kind": "tool_choice",
+        "passed": true,
+        "expected": [
+          "get_ticket"
+        ],
+        "actual": [
+          "get_ticket"
+        ]
+      },
+      {
+        "id": "tool-04",
+        "kind": "tool_choice",
+        "passed": true,
+        "expected": [
+          "a",
+          "b"
+        ],
+        "actual": [
+          "a",
+          "b"
+        ]
+      },
+      {
+        "id": "tool-05",
+        "kind": "tool_choice",
+        "passed": true,
+        "expected": [],
+        "actual": []
+      },
+      {
+        "id": "tool-06",
+        "kind": "tool_choice",
+        "passed": true,
+        "expected": [
+          "search_tickets"
+        ],
+        "actual": [
+          "search_tickets"
+        ]
+      },
+      {
+        "id": "task-01",
+        "kind": "task_completion",
+        "passed": true,
+        "expected": "completed",
+        "actual": "completed"
+      },
+      {
+        "id": "task-02",
+        "kind": "task_completion",
+        "passed": true,
+        "expected": "completed",
+        "actual": "completed"
+      },
+      {
+        "id": "task-03",
+        "kind": "task_completion",
+        "passed": true,
+        "expected": "partial",
+        "actual": "partial"
+      },
+      {
+        "id": "task-04",
+        "kind": "task_completion",
+        "passed": true,
+        "expected": "partial",
+        "actual": "partial"
+      },
+      {
+        "id": "task-05",
+        "kind": "task_completion",
+        "passed": true,
+        "expected": "failed",
+        "actual": "failed"
+      },
+      {
+        "id": "task-06",
+        "kind": "task_completion",
+        "passed": true,
+        "expected": "failed",
+        "actual": "failed"
+      },
+      {
+        "id": "review-01",
+        "kind": "reviewer",
+        "passed": true,
+        "expected": "knowledge",
+        "actual": "knowledge"
+      },
+      {
+        "id": "review-02",
+        "kind": "reviewer",
+        "passed": true,
+        "expected": "knowledge",
+        "actual": "knowledge"
+      },
+      {
+        "id": "review-03",
+        "kind": "reviewer",
+        "passed": true,
+        "expected": "knowledge",
+        "actual": "knowledge"
+      },
+      {
+        "id": "review-04",
+        "kind": "reviewer",
+        "passed": true,
+        "expected": "knowledge",
+        "actual": "knowledge"
+      },
+      {
+        "id": "review-05",
+        "kind": "reviewer",
+        "passed": true,
+        "expected": "supervisor",
+        "actual": "supervisor"
+      },
+      {
+        "id": "review-06",
+        "kind": "reviewer",
+        "passed": true,
+        "expected": "none",
+        "actual": "none"
+      }
+    ]
+  }
+}

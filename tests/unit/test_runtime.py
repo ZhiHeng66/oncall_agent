@@ -9,23 +9,26 @@ from app.config import Settings
 def test_checkpointer_factory_returns_isolated_memory_savers() -> None:
     factory = CheckpointerFactory(Settings(_env_file=None, dashscope_api_key=""))
 
-    first = factory.create()
-    second = factory.create()
+    first = factory.create_memory()
+    second = factory.create_memory()
 
     assert isinstance(first, MemorySaver)
     assert isinstance(second, MemorySaver)
     assert first is not second
 
 
-def test_checkpointer_factory_rejects_unimplemented_backend() -> None:
+async def test_checkpointer_factory_opens_sqlite_backend(tmp_path) -> None:
     settings = Settings(
         _env_file=None,
         dashscope_api_key="",
         checkpointer_backend="sqlite",
+        checkpoint_path=str(tmp_path / "checkpoints.sqlite3"),
     )
 
-    with pytest.raises(ValueError, match="Unsupported checkpointer backend"):
-        CheckpointerFactory(settings).create()
+    async with CheckpointerFactory(settings).open() as saver:
+        await saver.aget({"configurable": {"thread_id": "thread-1"}})
+
+    assert (tmp_path / "checkpoints.sqlite3").exists()
 
 
 def test_runtime_limits_are_loaded_from_settings() -> None:

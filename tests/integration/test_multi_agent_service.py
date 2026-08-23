@@ -79,6 +79,11 @@ class FakeRunner:
             "agent": "knowledge",
             "data": {"task_id": "one", "status": "success"},
         }
+        yield {"type": "final_content_delta", "data": {"content": "grounded answer "}}
+        yield {
+            "type": "final_content_delta",
+            "data": {"content": "token=private-answer-token [来源1]"},
+        }
         yield {
             "type": "graph_completed",
             "result": successful_result(run_id, thread_id).model_dump(mode="json"),
@@ -124,6 +129,7 @@ async def test_json_run_standardizes_sources_and_keeps_in_memory_lookup() -> Non
 
     response = await service.run(request)
     stored = await service.get_run(response.run_id)
+    trace = await service.get_trace(response.run_id)
     thread = await service.get_thread("thread")
 
     assert response.status == "completed"
@@ -132,6 +138,9 @@ async def test_json_run_standardizes_sources_and_keeps_in_memory_lookup() -> Non
     assert response.sources[0].excerpt == "token=[REDACTED] policy fact"
     assert response.sources[0].metadata == {"title": "Policy"}
     assert stored == response
+    assert trace is not None
+    assert trace.events[-1].type == "run_completed"
+    assert trace.metrics.failed is False
     assert thread.run_ids == [response.run_id]
     assert [item["role"] for item in thread.history] == ["user", "assistant"]
 
@@ -150,12 +159,21 @@ async def test_stream_uses_one_envelope_contract_and_exactly_one_terminal() -> N
         "tool_completed",
         "agent_completed",
         "content_delta",
+        "content_delta",
         "run_completed",
     ]
     assert len({event.run_id for event in events}) == 1
     assert all(event.thread_id == "thread" and event.timestamp for event in events)
     assert sum(event.type in {"run_completed", "run_failed"} for event in events) == 1
     assert events[1].data["authorization"] == "[REDACTED]"
+    assert (
+        "".join(event.data["content"] for event in events if event.type == "content_delta")
+        == (events[-1].data["result"]["answer"])
+    )
+    trace = await service.get_trace(events[0].run_id)
+    assert trace is not None
+    assert [event.type for event in trace.events] == [event.type for event in events]
+    assert trace.metrics.tool_call_count == 1
 
 
 async def test_stream_exception_emits_one_clean_failed_terminal() -> None:

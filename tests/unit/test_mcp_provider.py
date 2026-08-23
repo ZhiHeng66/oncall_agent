@@ -47,6 +47,7 @@ async def test_provider_caches_tools_and_tracks_per_server_health() -> None:
         {
             "cls": [cls_query],
             "monitor": RuntimeError("Authorization: Bearer private-token unavailable"),
+            "ticket": [],
         }
     )
 
@@ -60,15 +61,16 @@ async def test_provider_caches_tools_and_tracks_per_server_health() -> None:
 
     assert [item.tool.name for item in first] == ["cls_query"]
     assert second == first
-    assert client.calls == ["cls", "monitor"]
+    assert client.calls == ["cls", "monitor", "ticket"]
     assert provider.health()["cls"].status == "healthy"
     assert provider.health()["monitor"].status == "unavailable"
+    assert provider.health()["ticket"].status == "healthy"
     assert "private-token" not in (provider.health()["monitor"].error or "")
 
 
 @pytest.mark.asyncio
 async def test_provider_detects_duplicate_tool_names_across_servers() -> None:
-    client = FakeMCPClient({"cls": [cls_query], "monitor": [cls_query]})
+    client = FakeMCPClient({"cls": [cls_query], "monitor": [cls_query], "ticket": []})
 
     async def client_factory() -> FakeMCPClient:
         return client

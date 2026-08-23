@@ -749,7 +749,7 @@ class SuperBizAgentApp {
                 throw new Error((data.errors || []).join('；') || data.answer || '请求失败');
             }
             const messageElement = this.addMessage('assistant', data.answer || '（无回复内容）');
-            this.renderAgentSources(messageElement, data.sources || []);
+            this.renderAgentResult(messageElement, data);
         } catch (error) {
             // 出错时也要移除等待提示消息
             if (loadingMessage && loadingMessage.parentNode) {
@@ -786,8 +786,8 @@ class SuperBizAgentApp {
                 terminalReceived = true;
                 const result = event.data?.result || {};
                 fullResponse = result.answer || fullResponse;
-                this.renderAgentSources(assistantMessage, result.sources || []);
                 this.handleStreamComplete(assistantMessage, fullResponse);
+                this.renderAgentResult(assistantMessage, result);
             } else if (event.type === 'run_failed') {
                 terminalReceived = true;
                 const result = event.data?.result || {};
@@ -806,11 +806,18 @@ class SuperBizAgentApp {
     }
 
     createAgentTimeline(messageElement) {
-        const timeline = document.createElement('div');
+        const timeline = document.createElement('details');
         timeline.className = 'agent-timeline';
+        timeline.open = true;
+        const summary = document.createElement('summary');
+        summary.textContent = '执行过程';
+        const events = document.createElement('div');
+        events.className = 'timeline-events';
+        timeline.appendChild(summary);
+        timeline.appendChild(events);
         const wrapper = messageElement.querySelector('.message-content-wrapper');
         wrapper.insertBefore(timeline, wrapper.firstChild);
-        return timeline;
+        return events;
     }
 
     appendTimelineEvent(timeline, event) {
@@ -822,7 +829,9 @@ class SuperBizAgentApp {
             plan_created: 'Task Agent 已制定计划',
             step_started: `开始步骤：${event.data?.step || ''}`,
             tool_started: `调用工具：${event.data?.tool_name || ''}`,
-            tool_completed: `工具完成：${event.data?.tool_name || ''}`,
+            tool_completed: event.data?.status === 'failed'
+                ? `工具失败：${event.data?.tool_name || '未知工具'}`
+                : `工具完成：${event.data?.tool_name || '未知工具'}`,
             step_completed: `完成步骤：${event.data?.step || ''}`,
             step_failed: `步骤失败：${event.data?.step || ''}`,
             review_completed: event.data?.passed ? 'Reviewer 检查通过' : 'Reviewer 要求返工'
@@ -830,7 +839,108 @@ class SuperBizAgentApp {
         const item = document.createElement('div');
         item.className = `timeline-item timeline-${event.type}`;
         item.textContent = labels[event.type] || event.type;
+        if (event.type === 'review_completed' && !event.data?.passed && event.data?.issues?.length) {
+            const detail = document.createElement('div');
+            detail.className = 'timeline-detail';
+            detail.textContent = `原因：${event.data.issues.join('；')}`;
+            item.appendChild(detail);
+        }
         timeline.appendChild(item);
+    }
+
+    formatAgentAnswer(answer) {
+        const agentLabels = {
+            task: 'Task Agent',
+            knowledge: 'Knowledge Agent',
+            data: 'Data Agent'
+        };
+        const statusLabels = {
+            success: '完成',
+            partial: '部分完成',
+            failed: '失败'
+        };
+        return (answer || '（无回复内容）')
+            .replace(/\[(task|knowledge|data):(success|partial|failed)\]\s*/g,
+                (_, agent, status) => `\n\n### ${agentLabels[agent]} · ${statusLabels[status]}\n\n`)
+            .replace(/\s+未完成或错误：/g, '\n\n> **未完成项或错误：** ')
+            .replace(/\s+质量检查未通过：/g, '\n\n> **质量检查未通过：** ')
+            .replace(
+                /\d+ validation error for call\[([^\]]+)]\s+([a-zA-Z_][\w-]*)\s+Missing required argument\s+\[type=missing_argument[^\]]*]/g,
+                '工具 $1 参数校验失败：缺少必填参数 $2。'
+            )
+            .replace(/> \*\*质量检查未通过：\*\* ([^\n]+)/g, (_, issues) => {
+                const items = issues.split('；').filter(Boolean);
+                return `> **质量检查未通过：**\n>\n${items.map(item => `> - ${item}`).join('\n')}`;
+            })
+            .replace(/For further information visit https:\/\/errors\.pydantic\.dev\/\S+/g, '')
+            .trim();
+    }
+
+    humanizeAgentError(error) {
+        const text = String(error || '未知错误')
+            .replace(/For further information visit https:\/\/errors\.pydantic\.dev\/\S+/g, '')
+            .replace(/\s+/g, ' ')
+            .trim();
+        const missingArgument = text.match(/([a-zA-Z_][\w-]*) Missing required argument/);
+        if (missingArgument) {
+            return `工具参数校验失败：缺少必填参数 ${missingArgument[1]}。`;
+        }
+        return text;
+    }
+
+    renderAgentResult(messageElement, result) {
+        if (!messageElement) return;
+        const wrapper = messageElement.querySelector('.message-content-wrapper');
+        const content = wrapper.querySelector('.message-content');
+        if (content) {
+            content.innerHTML = this.renderMarkdown(this.formatAgentAnswer(result.answer));
+            this.highlightCodeBlocks(content);
+        }
+
+        wrapper.querySelector('.agent-result-meta')?.remove();
+        const meta = document.createElement('div');
+        meta.className = 'agent-result-meta';
+        const status = document.createElement('span');
+        status.className = `result-status status-${result.status || 'completed'}`;
+        status.textContent = {
+            completed: '已完成',
+            partial: '部分完成',
+            failed: '执行失败'
+        }[result.status] || result.status || '已完成';
+        meta.appendChild(status);
+
+        if (result.route?.mode) {
+            const route = document.createElement('span');
+            route.className = 'result-route';
+            route.textContent = `路由：${result.route.mode}`;
+            meta.appendChild(route);
+        }
+        if (result.agents?.length) {
+            const agents = document.createElement('span');
+            agents.className = 'result-agents';
+            agents.textContent = `参与：${result.agents.join(' → ')}`;
+            meta.appendChild(agents);
+        }
+        wrapper.insertBefore(meta, content);
+
+        wrapper.querySelector('.agent-errors')?.remove();
+        if (result.errors?.length) {
+            const errors = document.createElement('details');
+            errors.className = 'agent-errors';
+            const summary = document.createElement('summary');
+            summary.textContent = `查看 ${result.errors.length} 条未完成项或错误`;
+            const list = document.createElement('ul');
+            result.errors.forEach((error) => {
+                const item = document.createElement('li');
+                item.textContent = this.humanizeAgentError(error);
+                list.appendChild(item);
+            });
+            errors.appendChild(summary);
+            errors.appendChild(list);
+            wrapper.insertBefore(errors, content.nextSibling);
+        }
+
+        this.renderAgentSources(messageElement, result.sources || []);
     }
 
     renderAgentSources(messageElement, sources) {
@@ -845,14 +955,16 @@ class SuperBizAgentApp {
         container.innerHTML = '';
         const title = document.createElement('div');
         title.className = 'sources-title';
-        title.textContent = '来源';
+        title.textContent = `来源（${sources.length}）`;
         container.appendChild(title);
         sources.forEach((source, index) => {
-            const card = document.createElement('div');
+            const card = document.createElement('details');
             card.className = 'source-card';
-            const name = document.createElement('strong');
-            name.textContent = `[来源${index + 1}] ${source.source_name}`;
-            const excerpt = document.createElement('span');
+            const name = document.createElement('summary');
+            const sourceType = source.source_type ? ` · ${source.source_type.toUpperCase()}` : '';
+            name.textContent = `[来源${index + 1}] ${source.source_name}${sourceType}`;
+            const excerpt = document.createElement('div');
+            excerpt.className = 'source-excerpt';
             excerpt.textContent = source.excerpt || '';
             card.appendChild(name);
             card.appendChild(excerpt);

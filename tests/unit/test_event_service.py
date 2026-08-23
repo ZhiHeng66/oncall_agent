@@ -32,3 +32,16 @@ def test_event_envelope_has_required_fields_and_redacts_nested_secrets() -> None
     assert payload["data"]["authorization"] == "[REDACTED]"
     assert payload["data"]["nested"]["api_key"] == "[REDACTED]"
     assert len(payload["data"]["summary"]) == 30
+
+
+def test_content_delta_preserves_whitespace_and_redacts_credentials() -> None:
+    service = AgentEventService(Settings(_env_file=None, dashscope_api_key=""))
+
+    event = service.create(
+        run_id="run-1",
+        thread_id="thread-1",
+        event_type="content_delta",
+        data={"content": "\n answer Authorization: Bearer private-token "},
+    )
+
+    assert event.data["content"] == "\n answer Authorization: [REDACTED] "

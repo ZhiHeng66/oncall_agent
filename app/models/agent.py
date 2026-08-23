@@ -83,6 +83,7 @@ class AgentEventEnvelope(BaseModel):
     type: AgentEventType
     timestamp: datetime
     agent: PublicAgentName | None = None
+    node: str | None = None
     data: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -95,3 +96,36 @@ class AgentThreadResponse(BaseModel):
 class AgentThreadDeleteResponse(BaseModel):
     thread_id: str
     deleted_runs: int
+
+
+class AgentRunMetrics(BaseModel):
+    duration_ms: float
+    dispatch_count: int = 0
+    tool_call_count: int = 0
+    task_step_count: int = 0
+    failed: bool = False
+    timed_out: bool = False
+    model_calls: int | None = None
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+    token_cost: float | None = None
+
+
+class AgentRunTraceResponse(BaseModel):
+    run: AgentRunResponse
+    events: list[AgentEventEnvelope] = Field(default_factory=list)
+    metrics: AgentRunMetrics
+
+
+class AgentMetricsResponse(BaseModel):
+    total_runs: int
+    failure_rate: float
+    timeout_rate: float
+    average_duration_ms: float
+    average_dispatch_count: float
+    average_tool_call_count: float
+    average_task_step_count: float
+    model_calls: int | None = None
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+    token_cost: float | None = None

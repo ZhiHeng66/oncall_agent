@@ -432,26 +432,116 @@ body {
 }
 
 .agent-timeline {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    margin: 0 0 10px 18px;
+    margin: 0 0 14px 18px;
+    border: 1px solid #d9e4f8;
+    border-radius: 12px;
+    background: #f8faff;
+    overflow: hidden;
+}
+
+.agent-timeline > summary {
+    cursor: pointer;
+    padding: 10px 12px;
+    color: #315a9b;
+    font-size: 0.82rem;
+    font-weight: 600;
+    user-select: none;
+}
+
+.timeline-events {
+    display: grid;
+    gap: 0;
+    padding: 0 12px 10px 24px;
+    border-top: 1px solid #e5ecf8;
 }
 
 .timeline-item {
-    padding: 4px 9px;
-    border-radius: 999px;
-    background: #eef3fd;
+    position: relative;
+    padding: 8px 8px 8px 12px;
     color: #315a9b;
-    font-size: 0.75rem;
-    border: 1px solid #d9e4f8;
+    font-size: 0.78rem;
+    border-left: 2px solid #c8d8f2;
+    overflow-wrap: anywhere;
+}
+
+.timeline-item::before {
+    content: '';
+    position: absolute;
+    width: 7px;
+    height: 7px;
+    left: -4.5px;
+    top: 13px;
+    border-radius: 50%;
+    background: #5b84c4;
+}
+
+.timeline-detail {
+    margin-top: 4px;
+    color: #6f7785;
+    font-size: 0.74rem;
+    line-height: 1.45;
 }
 
 .timeline-step_failed,
 .timeline-run_failed {
-    background: #fce8e6;
     color: #b3261e;
     border-color: #f5c2bd;
+}
+
+.timeline-step_failed::before,
+.timeline-run_failed::before {
+    background: #b3261e;
+}
+
+.agent-result-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 7px;
+    margin: 0 0 8px 18px;
+    color: #5f6368;
+    font-size: 0.76rem;
+}
+
+.result-status,
+.result-route,
+.result-agents {
+    padding: 4px 8px;
+    border-radius: 999px;
+    background: #f1f3f4;
+}
+
+.result-status {
+    font-weight: 600;
+}
+
+.status-completed { background: #e6f4ea; color: #137333; }
+.status-partial { background: #fef7e0; color: #8a5d00; }
+.status-failed { background: #fce8e6; color: #b3261e; }
+
+.agent-errors {
+    margin: 0 0 12px 18px;
+    border: 1px solid #f2d39b;
+    border-radius: 10px;
+    background: #fffaf0;
+    color: #744c00;
+    font-size: 0.8rem;
+}
+
+.agent-errors > summary {
+    cursor: pointer;
+    padding: 9px 11px;
+    font-weight: 600;
+}
+
+.agent-errors ul {
+    margin: 0;
+    padding: 0 14px 10px 30px;
+}
+
+.agent-errors li {
+    margin-top: 5px;
+    overflow-wrap: anywhere;
 }
 
 .agent-sources {
@@ -467,9 +557,6 @@ body {
 }
 
 .source-card {
-    display: grid;
-    gap: 3px;
-    padding: 9px 11px;
     border-radius: 10px;
     background: #f8f9fa;
     border: 1px solid #e8eaed;
@@ -477,8 +564,23 @@ body {
     font-size: 0.78rem;
 }
 
-.source-card strong {
+.source-card > summary {
+    cursor: pointer;
+    padding: 10px 11px;
     color: #202124;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+
+.source-excerpt {
+    max-height: 220px;
+    overflow: auto;
+    padding: 0 11px 11px;
+    border-top: 1px solid #eceff1;
+    padding-top: 9px;
+    line-height: 1.55;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
 }
 
 /* Markdown渲染样式 */

@@ -28,12 +28,19 @@ _BEARER_TOKEN = re.compile(r"(?i)\bBearer\s+[A-Za-z0-9._~+/=-]+")
 
 def sanitize_error_message(message: str, max_length: int = 300) -> str:
     """Remove common credentials and bound externally visible errors."""
-    sanitized = _AUTHORIZATION_VALUE.sub("Authorization: [REDACTED]", message)
-    sanitized = _SENSITIVE_ASSIGNMENT.sub(r"\1\2[REDACTED]", sanitized)
-    sanitized = _BEARER_TOKEN.sub("Bearer [REDACTED]", sanitized)
+    sanitized = redact_sensitive_text(message)
     sanitized = sanitized.replace("\n", " ").strip()
     if len(sanitized) > max_length:
         return f"{sanitized[: max_length - 3]}..."
+    return sanitized
+
+
+def redact_sensitive_text(message: str) -> str:
+    """Remove credential-shaped text while preserving whitespace and line breaks."""
+
+    sanitized = _AUTHORIZATION_VALUE.sub("Authorization: [REDACTED]", message)
+    sanitized = _SENSITIVE_ASSIGNMENT.sub(r"\1\2[REDACTED]", sanitized)
+    sanitized = _BEARER_TOKEN.sub("Bearer [REDACTED]", sanitized)
     return sanitized
 
 

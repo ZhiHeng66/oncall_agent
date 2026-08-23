@@ -40,7 +40,7 @@ class TaskAgent:
         self._executor = executor or SpecialistTaskStepExecutor()
         self._replanner = replanner or LLMTaskReplanner()
         self._limits = limits
-        self.checkpointer = checkpointers.create()
+        self.checkpointer = checkpointers.create_memory()
         self.graph = self._build_graph()
 
     def _build_graph(self):

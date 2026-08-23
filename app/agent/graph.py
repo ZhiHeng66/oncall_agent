@@ -1,11 +1,13 @@
 """Top-level bounded Supervisor-Specialist LangGraph."""
 
 import asyncio
+import re
 import time
 from collections.abc import AsyncGenerator, Awaitable, Callable
 from typing import Any, Protocol
 from uuid import uuid4
 
+from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.config import get_stream_writer
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import Send
@@ -20,6 +22,7 @@ from app.agent.contracts import (
     ReviewResult,
     RouteDecision,
 )
+from app.agent.final_response import FinalResponseGenerator, final_response_generator
 from app.agent.mcp_client import sanitize_error_message
 from app.agent.runtime.checkpointer import CheckpointerFactory, checkpointer_factory
 from app.agent.runtime.limits import RuntimeLimits, runtime_limits
@@ -37,7 +40,8 @@ NODE_TASK = "task_agent"
 NODE_AGGREGATE = "aggregate"
 NODE_REVIEWER = "reviewer"
 NODE_PREPARE_RETRY = "prepare_retry"
-NODE_FINALIZE = "finalize"
+NODE_FINALIZE = "final_response"
+CITATION_PATTERN = re.compile(r"\[来源(\d+)]")
 
 
 class Supervisor(Protocol):
@@ -91,6 +95,7 @@ class MultiAgentGraph:
         data: DataSpecialist = data_agent,
         task: TaskSpecialist = task_agent,
         reviewer: Reviewer = reviewer_agent,
+        final_response: FinalResponseGenerator = final_response_generator,
         limits: RuntimeLimits = runtime_limits,
         checkpointers: CheckpointerFactory = checkpointer_factory,
     ) -> None:
@@ -99,8 +104,15 @@ class MultiAgentGraph:
         self._data = data
         self._task = task
         self._reviewer: Reviewer = reviewer
+        self._final_response = final_response
         self._limits = limits
-        self.checkpointer = checkpointers.create()
+        self.checkpointer = checkpointers.create_memory()
+        self.graph = self._build_graph()
+
+    def set_checkpointer(self, checkpointer: BaseCheckpointSaver) -> None:
+        """Recompile the graph with a lifespan-managed persistent saver."""
+
+        self.checkpointer = checkpointer
         self.graph = self._build_graph()
 
     def _build_graph(self):
@@ -222,11 +234,19 @@ class MultiAgentGraph:
                     if event.get("type") in {"run_completed", "run_failed"}:
                         result = AgentResult.model_validate(event["result"])
                         continue
+                    event_data = dict(event.get("data", {}))
+                    event_data.update(
+                        {
+                            key: value
+                            for key, value in event.items()
+                            if key not in {"type", "agent", "data"}
+                        }
+                    )
                     writer(
                         {
                             "type": event.get("type", "step_completed"),
-                            "agent": "task",
-                            "data": {key: value for key, value in event.items() if key != "type"},
+                            "agent": event.get("agent", "task"),
+                            "data": event_data,
                         }
                     )
             if result is None:
@@ -322,8 +342,10 @@ class MultiAgentGraph:
                 "status": "failed",
             }
         sections: list[str] = []
+        evidence_indexes = self._evidence_indexes(state["agent_results"])
         for result in latest:
-            sections.append(f"[{result.agent_name}:{result.status}]\n{result.summary}")
+            summary = self._rewrite_citations(result.summary, result.evidence, evidence_indexes)
+            sections.append(f"[{result.agent_name}:{result.status}]\n{summary}")
             if result.errors:
                 sections.append("未完成或错误：" + "；".join(result.errors))
         statuses = {item.status for item in latest}
@@ -383,7 +405,7 @@ class MultiAgentGraph:
     def prepare_retry_node(state: MultiAgentState) -> dict[str, Any]:
         return {"retry_count": state["retry_count"] + 1}
 
-    def finalize_node(self, state: MultiAgentState) -> dict[str, Any]:
+    async def finalize_node(self, state: MultiAgentState) -> dict[str, Any]:
         if state["final_answer"]:
             return {}
         answer = state["candidate_answer"] or "没有生成最终答案。"
@@ -400,6 +422,31 @@ class MultiAgentGraph:
             reason = "fast_path"
         if status == "failed":
             reason = "all_specialists_failed"
+
+        answer = "\n".join(
+            sanitize_error_message(line, max_length=max(len(line), 4))
+            for line in answer.splitlines()
+        )
+
+        should_generate = status != "failed" and (review is None or review.passed)
+        if should_generate:
+            writer = get_stream_writer()
+            try:
+                answer = await self._final_response.generate(
+                    state["user_query"],
+                    answer,
+                    event_sink=lambda content: writer(
+                        {"type": "final_content_delta", "data": {"content": content}}
+                    ),
+                )
+            except Exception as exc:
+                detail = sanitize_error_message(str(exc))
+                return {
+                    "final_answer": answer,
+                    "status": "partial",
+                    "termination_reason": "finalization_failed",
+                    "workflow_errors": [detail],
+                }
         return {"final_answer": answer, "status": status, "termination_reason": reason}
 
     def route_after_aggregate(self, state: MultiAgentState) -> str:
@@ -467,7 +514,7 @@ class MultiAgentGraph:
             ):
                 if mode == "custom":
                     yield event
-            snapshot = self.graph.get_state(graph_config)
+            snapshot = await self.graph.aget_state(graph_config)
             result = self._to_result(snapshot.values)
         except Exception as exc:
             detail = sanitize_error_message(str(exc))
@@ -533,6 +580,31 @@ class MultiAgentGraph:
                 key = (evidence.source_name, evidence.source_id, evidence.content)
                 unique[key] = evidence
         return list(unique.values())
+
+    @staticmethod
+    def _evidence_indexes(results: list[AgentResult]) -> dict[tuple[str, str | None], int]:
+        indexes: dict[tuple[str, str | None], int] = {}
+        for result in results:
+            for evidence in result.evidence:
+                key = (evidence.source_name, evidence.source_id)
+                if key not in indexes:
+                    indexes[key] = len(indexes) + 1
+        return indexes
+
+    @staticmethod
+    def _rewrite_citations(
+        summary: str,
+        evidence: list[Evidence],
+        evidence_indexes: dict[tuple[str, str | None], int],
+    ) -> str:
+        local_to_global = {
+            local_index: evidence_indexes[(item.source_name, item.source_id)]
+            for local_index, item in enumerate(evidence, 1)
+        }
+        return CITATION_PATTERN.sub(
+            lambda match: f"[来源{local_to_global.get(int(match.group(1)), match.group(1))}]",
+            summary,
+        )
 
     @staticmethod
     def _collect_errors(results: list[AgentResult], workflow_errors: list[str]) -> list[str]:
