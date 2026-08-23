@@ -4,9 +4,10 @@ from pathlib import Path
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
-
-from app.services.vector_index_service import vector_index_service
 from loguru import logger
+
+from app.agent.mcp_client import sanitize_error_message
+from app.services.vector_index_service import vector_index_service
 
 router = APIRouter()
 
@@ -61,7 +62,9 @@ async def upload_file(file: UploadFile = File(...)):
 
         # 验证文件大小
         if len(content) > MAX_FILE_SIZE:
-            raise HTTPException(status_code=400, detail=f"文件大小超过限制（最大 {MAX_FILE_SIZE} 字节）")
+            raise HTTPException(
+                status_code=400, detail=f"文件大小超过限制（最大 {MAX_FILE_SIZE} 字节）"
+            )
 
         file_path.write_bytes(content)
 
@@ -93,12 +96,13 @@ async def upload_file(file: UploadFile = File(...)):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"文件上传失败: {e}")
-        raise HTTPException(status_code=500, detail=f"文件上传失败: {e}")
+        detail = sanitize_error_message(str(e))
+        logger.error(f"文件上传失败: {detail}")
+        raise HTTPException(status_code=500, detail=f"文件上传失败: {detail}") from e
 
 
 @router.post("/index_directory")
-async def index_directory(directory_path: str = None):
+async def index_directory(directory_path: str | None = None):
     """
     索引指定目录下的所有文件
 
@@ -124,8 +128,9 @@ async def index_directory(directory_path: str = None):
         )
 
     except Exception as e:
-        logger.error(f"索引目录失败: {e}")
-        raise HTTPException(status_code=500, detail=f"索引目录失败: {e}")
+        detail = sanitize_error_message(str(e))
+        logger.error(f"索引目录失败: {detail}")
+        raise HTTPException(status_code=500, detail=f"索引目录失败: {detail}") from e
 
 
 def _get_file_extension(filename: str) -> str:
@@ -157,6 +162,6 @@ def _sanitize_filename(filename: str) -> str:
     # 去除空格
     sanitized = filename.replace(" ", "_")
     # 去除其他可能导致问题的字符
-    for char in ['\\', '/', ':', '*', '?', '"', '<', '>', '|']:
+    for char in ["\\", "/", ":", "*", "?", '"', "<", ">", "|"]:
         sanitized = sanitized.replace(char, "_")
     return sanitized

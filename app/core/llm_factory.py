@@ -1,52 +1,78 @@
-"""LLM 工厂类
+"""Central factory for chat models used by agents and workflow nodes."""
 
-使用 LangChain ChatOpenAI 通过 OpenAI 兼容模式调用阿里云 DashScope
-这种方式便于后续切换到其他支持 OpenAI API 的模型提供商
+from collections.abc import Callable
+from typing import Any, Literal
 
-支持的模型提供商（只需修改 base_url 和 api_key）：
-- 阿里云 DashScope: https://dashscope.aliyuncs.com/compatible-mode/v1
-- OpenAI: https://api.openai.com/v1
-- Azure OpenAI: https://{resource}.openai.azure.com
-- 其他兼容 OpenAI API 的服务
-"""
+from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_qwq import ChatQwen
 
-from langchain_openai import ChatOpenAI
-from app.config import config
-from loguru import logger
+from app.config import Settings, config
+
+LLMRole = Literal["chat", "supervisor", "specialist", "task", "reviewer"]
 
 
 class LLMFactory:
-    """LLM 工厂类 - 使用 OpenAI 兼容模式"""
+    """Create role-specific models from application settings.
 
-    # 阿里云 DashScope OpenAI 兼容模式 URL
-    DASHSCOPE_BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    ``model_builder`` is injectable so tests never need a provider credential or
+    network connection.
+    """
 
-    @staticmethod
+    def __init__(
+        self,
+        settings: Settings = config,
+        model_builder: Callable[..., BaseChatModel] = ChatQwen,
+    ) -> None:
+        self._settings = settings
+        self._model_builder = model_builder
+
     def create_chat_model(
+        self,
+        role: LLMRole = "chat",
+        *,
         model: str | None = None,
-        temperature: float = 0.7,
-        streaming: bool = True,
-        base_url: str | None = None,
+        temperature: float | None = None,
+        streaming: bool | None = None,
         api_key: str | None = None,
-    ) -> ChatOpenAI:
-        model = model or config.dashscope_model
-        base_url = base_url or LLMFactory.DASHSCOPE_BASE_URL
-        api_key = api_key or config.dashscope_api_key
-
-        # 参考：https://help.aliyun.com/zh/model-studio/getting-started/models
-        extra_body = {}
-        extra_body["stream"] = streaming
-
-        llm = ChatOpenAI(
-            model=model,
-            temperature=temperature,
-            streaming=streaming,
-            base_url=base_url,
-            api_key=api_key,
-            extra_body=extra_body if extra_body else None,
+        **overrides: Any,
+    ) -> BaseChatModel:
+        profiles: dict[LLMRole, tuple[str, float, bool]] = {
+            "chat": (
+                self._settings.rag_model,
+                self._settings.chat_temperature,
+                True,
+            ),
+            "supervisor": (
+                self._settings.supervisor_model,
+                self._settings.agent_temperature,
+                False,
+            ),
+            "specialist": (
+                self._settings.specialist_model,
+                self._settings.agent_temperature,
+                False,
+            ),
+            "task": (
+                self._settings.specialist_model,
+                self._settings.agent_temperature,
+                False,
+            ),
+            "reviewer": (
+                self._settings.reviewer_model,
+                self._settings.agent_temperature,
+                False,
+            ),
+        }
+        default_model, default_temperature, default_streaming = profiles[role]
+        return self._model_builder(
+            model=model or default_model,
+            api_key=api_key or self._settings.dashscope_api_key,
+            temperature=default_temperature if temperature is None else temperature,
+            streaming=default_streaming if streaming is None else streaming,
+            timeout=self._settings.llm_timeout_seconds,
+            max_retries=self._settings.llm_max_retries,
+            **overrides,
         )
 
-        return llm
 
-# 全局 LLM 工厂实例
 llm_factory = LLMFactory()

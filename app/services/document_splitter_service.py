@@ -1,7 +1,6 @@
 """文档分割服务模块 - 基于 LangChain 的智能文档分割"""
 
 from pathlib import Path
-from typing import List
 
 from langchain_core.documents import Document
 from langchain_text_splitters import MarkdownHeaderTextSplitter, RecursiveCharacterTextSplitter
@@ -42,7 +41,7 @@ class DocumentSplitterService:
             f"overlap={self.chunk_overlap}"
         )
 
-    def split_markdown(self, content: str, file_path: str = "") -> List[Document]:
+    def split_markdown(self, content: str, file_path: str = "") -> list[Document]:
         """
         分割 Markdown 文档 (两阶段分割 + 合并小片段)
 
@@ -80,7 +79,7 @@ class DocumentSplitterService:
             logger.error(f"Markdown 分割失败: {file_path}, 错误: {e}")
             raise
 
-    def split_text(self, content: str, file_path: str = "") -> List[Document]:
+    def split_text(self, content: str, file_path: str = "") -> list[Document]:
         """
         分割普通文本文档
 
@@ -97,15 +96,17 @@ class DocumentSplitterService:
 
         try:
             # 直接使用递归字符分割器
-            docs = self.text_splitter.create_documents(
-                texts=[content],
-                metadatas=[
-                    {
-                        "_source": file_path,
-                        "_extension": Path(file_path).suffix,
-                        "_file_name": Path(file_path).name,
-                    }
-                ],
+            docs = list(
+                self.text_splitter.create_documents(
+                    texts=[content],
+                    metadatas=[
+                        {
+                            "_source": file_path,
+                            "_extension": Path(file_path).suffix,
+                            "_file_name": Path(file_path).name,
+                        }
+                    ],
+                )
             )
 
             logger.info(f"文本分割完成: {file_path} -> {len(docs)} 个分片")
@@ -115,7 +116,7 @@ class DocumentSplitterService:
             logger.error(f"文本分割失败: {file_path}, 错误: {e}")
             raise
 
-    def split_document(self, content: str, file_path: str = "") -> List[Document]:
+    def split_document(self, content: str, file_path: str = "") -> list[Document]:
         """
         智能分割文档 (根据文件类型选择分割器)
 
@@ -131,9 +132,7 @@ class DocumentSplitterService:
         else:
             return self.split_text(content, file_path)
 
-    def _merge_small_chunks(
-        self, documents: List[Document], min_size: int = 300
-    ) -> List[Document]:
+    def _merge_small_chunks(self, documents: list[Document], min_size: int = 300) -> list[Document]:
         """
         合并太小的分片
 

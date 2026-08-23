@@ -3,17 +3,20 @@
 主应用程序，配置路由、中间件、静态文件等
 """
 
+import os
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from contextlib import asynccontextmanager
-import os
-
-from app.config import config
+from fastapi.staticfiles import StaticFiles
 from loguru import logger
-from app.api import chat, health, file, aiops
+
+from app.agent.mcp_client import sanitize_error_message
+from app.api import aiops, chat, file, health
+from app.config import config
 from app.core.milvus_client import milvus_manager
+from app.tools.registry import tool_registry
 
 
 @asynccontextmanager
@@ -25,16 +28,22 @@ async def lifespan(app: FastAPI):
     logger.info(f"📝 环境: {'开发' if config.debug else '生产'}")
     logger.info(f"🌐 监听地址: http://{config.host}:{config.port}")
     logger.info(f"📚 API 文档: http://{config.host}:{config.port}/docs")
-    
+
     # 连接 Milvus
     logger.info("🔌 正在连接 Milvus...")
     milvus_manager.connect()
     logger.info("✅ Milvus 连接成功")
-    
+
+    # MCP 预热失败不得阻止其余本地能力启动。
+    try:
+        await tool_registry.warmup_mcp_tools()
+    except Exception as exc:
+        logger.warning("MCP 工具预热失败，继续启动本地能力: {}", sanitize_error_message(str(exc)))
+
     logger.info("=" * 60)
-    
+
     yield
-    
+
     # 关闭时执行
     logger.info("🔌 正在关闭 Milvus 连接...")
     milvus_manager.close()
@@ -46,7 +55,7 @@ app = FastAPI(
     title=config.app_name,
     version=config.app_version,
     description="基于 LangChain 的智能oncall运维系统",
-    lifespan=lifespan
+    lifespan=lifespan,
 )
 
 # 配置 CORS
@@ -68,6 +77,7 @@ app.include_router(aiops.router, prefix="/api", tags=["AIOps智能运维"])
 static_dir = "static"
 app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
+
 @app.get("/")
 async def root():
     """返回首页"""
@@ -77,17 +87,13 @@ async def root():
     return {
         "message": f"Welcome to {config.app_name} API",
         "version": config.app_version,
-        "docs": "/docs"
+        "docs": "/docs",
     }
 
 
 if __name__ == "__main__":
     import uvicorn
-    
+
     uvicorn.run(
-        "app.main:app",
-        host=config.host,
-        port=config.port,
-        reload=config.debug,
-        log_level="info"
+        "app.main:app", host=config.host, port=config.port, reload=config.debug, log_level="info"
     )

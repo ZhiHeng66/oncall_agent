@@ -3,7 +3,8 @@
 使用 Pydantic Settings 实现类型安全的配置管理
 """
 
-from typing import Dict, Any
+from typing import Any
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -37,6 +38,13 @@ class Settings(BaseSettings):
     # RAG 配置
     rag_top_k: int = 3
     rag_model: str = "qwen-max"  # 使用快速响应模型，不带扩展思考
+    supervisor_model: str = "qwen-max"
+    specialist_model: str = "qwen-max"
+    reviewer_model: str = "qwen-max"
+    chat_temperature: float = 0.7
+    agent_temperature: float = 0.0
+    llm_timeout_seconds: float = 60.0
+    llm_max_retries: int = 2
 
     # 文档分块配置
     chunk_max_size: int = 800
@@ -48,13 +56,23 @@ class Settings(BaseSettings):
     mcp_cls_url: str = "http://localhost:8003/mcp"
     mcp_monitor_transport: str = "streamable-http"
     mcp_monitor_url: str = "http://localhost:8004/mcp"
+    mcp_tool_cache_ttl_seconds: float = 300.0
+
+    # Agent 运行限制
+    checkpointer_backend: str = "memory"
+    supervisor_max_rounds: int = 4
+    task_max_steps: int = 8
+    reviewer_max_retries: int = 1
+    tool_timeout_seconds: float = 15.0
+    tool_max_retries: int = 3
+    graph_recursion_limit: int = 50
 
     # Prometheus
     prometheus_base_url: str = "http://127.0.0.1:9090"
     prometheus_request_timeout: float = 10.0
 
     @property
-    def mcp_servers(self) -> Dict[str, Dict[str, Any]]:
+    def mcp_servers(self) -> dict[str, dict[str, Any]]:
         """获取完整的 MCP 服务器配置"""
         return {
             "cls": {
@@ -64,7 +82,7 @@ class Settings(BaseSettings):
             "monitor": {
                 "transport": self.mcp_monitor_transport,
                 "url": self.mcp_monitor_url,
-            }
+            },
         }
 
 

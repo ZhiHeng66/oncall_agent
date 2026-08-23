@@ -9,6 +9,7 @@ UPLOAD_API = $(SERVER_URL)/api/upload
 HEALTH_CHECK_API = $(SERVER_URL)/health
 DOCS_DIR = aiops-docs
 MILVUS_CONTAINER = milvus-standalone
+PYTHON ?= .venv/bin/python
 
 # 颜色输出
 GREEN = \033[0;32m
@@ -532,38 +533,38 @@ remove:  ## 移除依赖包 (用法: make remove PKG=package_name)
 
 format:  ## 格式化代码
 	@echo "$(YELLOW)🎨 格式化代码...$(NC)"
-	python3 -m ruff check --select I --fix app/ 2>/dev/null || true
-	python3 -m ruff format app/ 2>/dev/null || python3 -m black app/
+	$(PYTHON) -m ruff check --no-respect-gitignore --select I --fix app/
+	$(PYTHON) -m ruff format --no-respect-gitignore app/
 	@echo "$(GREEN)✅ 格式化完成$(NC)"
 
 lint:  ## 代码检查
 	@echo "$(YELLOW)🔍 代码检查...$(NC)"
-	python3 -m ruff check app/ 2>/dev/null || python3 -m flake8 app/
+	$(PYTHON) -m ruff check --no-respect-gitignore app/ tests/
 	@echo "$(GREEN)✅ 检查完成$(NC)"
 
 fix:  ## 自动修复代码问题
 	@echo "$(YELLOW)🔧 自动修复代码问题...$(NC)"
-	python3 -m ruff check --fix app/ 2>/dev/null || true
-	python3 -m ruff format app/ 2>/dev/null || python3 -m black app/
+	$(PYTHON) -m ruff check --no-respect-gitignore --fix app/ tests/
+	$(PYTHON) -m ruff format --no-respect-gitignore app/ tests/
 	@echo "$(GREEN)✅ 修复完成$(NC)"
 
 type-check:  ## 类型检查
 	@echo "$(YELLOW)🔍 类型检查...$(NC)"
-	python3 -m mypy app/ --ignore-missing-imports
+	$(PYTHON) -m mypy app/ --ignore-missing-imports
 	@echo "$(GREEN)✅ 类型检查完成$(NC)"
 
 security:  ## 安全检查
 	@echo "$(YELLOW)🔒 安全检查...$(NC)"
-	python3 -m bandit -r app/ -ll
+	$(PYTHON) -m bandit -r app/ -ll
 	@echo "$(GREEN)✅ 安全检查完成$(NC)"
 
 test:  ## 运行测试
 	@echo "$(YELLOW)🧪 运行测试...$(NC)"
-	python3 -m pytest tests/ -v --cov=app --cov-report=term-missing --cov-report=html
+	$(PYTHON) -m pytest tests/ -v --cov=app --cov-report=term-missing --cov-report=html
 
 test-quick:  ## 快速测试
 	@echo "$(YELLOW)⚡ 快速测试...$(NC)"
-	python3 -m pytest tests/ -v
+	$(PYTHON) -m pytest tests/ -v
 
 check-all:  ## 运行所有检查
 	@echo "$(YELLOW)🚀 运行所有检查...$(NC)"
