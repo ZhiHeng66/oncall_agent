@@ -1,0 +1,140 @@
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Python build and packaging outputs
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments and package managers
+.venv/
+venv/
+env/
+ENV/
+.uv/
+__pypackages__/
+.pdm-python
+.pdm-build/
+
+# Secrets and machine-local configuration
+.env
+.env.*
+!.env.example
+!.env.template
+*.local
+
+# Tests, coverage and quality-tool caches
+.pytest_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.tox/
+.nox/
+.hypothesis/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyright/
+.ruff_cache/
+.cache/
+
+# Jupyter and interactive Python
+.ipynb_checkpoints/
+.ipython/
+profile_default/
+
+# Documentation build outputs
+docs/_build/
+site/
+
+# Runtime data
+logs/
+*.log
+*.log.*
+*.pid
+*.pid.lock
+*.seed
+*.tmp
+*.temp
+uploads/
+volumes/
+
+# Local databases
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+*.sqlite-journal
+
+# Large generated datasets, indexes, models and checkpoints
+data/
+datasets/
+artifacts/
+models/
+checkpoints/
+*.arrow
+*.feather
+*.parquet
+*.npy
+*.npz
+*.pkl
+*.pickle
+*.joblib
+*.h5
+*.hdf5
+*.bin
+*.ckpt
+*.onnx
+*.pt
+*.pth
+*.safetensors
+*.faiss
+*.index
+
+# Generated archives (use Git LFS if an archive must be versioned)
+*.7z
+*.bz2
+*.gz
+*.rar
+*.tar
+*.tgz
+*.xz
+*.zip
+
+# IDEs and editors
+.vscode/
+.idea/
+*.code-workspace
+*.swp
+*.swo
+*~
+
+# OS metadata
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*
+Thumbs.db
+Desktop.ini
+
+# Project-specific assistant/editor state
+.codebuddy/
