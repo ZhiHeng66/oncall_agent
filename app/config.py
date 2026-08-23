@@ -73,6 +73,9 @@ class Settings(BaseSettings):
     tool_max_retries: int = 3
     data_max_tool_calls: int = 4
     tool_result_max_chars: int = 4000
+    api_source_excerpt_max_chars: int = 500
+    api_event_data_max_chars: int = 2000
+    api_answer_max_chars: int = 20000
     graph_recursion_limit: int = 50
 
     # Prometheus

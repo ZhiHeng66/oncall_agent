@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>智能OnCall助手</title>
+    <title>企业知识服务多智能体平台</title>
     <link rel="stylesheet" href="/static/styles.css">
     <!-- Markdown 渲染库 -->
     <script src="https://cdn.jsdelivr.net/npm/marked@11.1.1/marked.min.js"></script>
@@ -16,7 +16,7 @@
         <!-- 左侧边栏 -->
         <aside class="sidebar">
             <div class="sidebar-header">
-                <h2 class="sidebar-title">智能OnCall助手</h2>
+                <h2 class="sidebar-title">企业知识服务平台</h2>
             </div>
             
             <div class="sidebar-content">
@@ -41,17 +41,9 @@
 
         <!-- 主内容区域 -->
         <main class="main-content">
-            <button class="ai-ops-top-btn" id="aiOpsSidebarBtn">
-                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                    <path d="M2 17L12 22L22 17" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                    <path d="M2 12L12 17L22 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                </svg>
-                <span>AI Ops</span>
-            </button>
             <div class="chat-container">
                 <div class="welcome-greeting" id="welcomeGreeting">
-                    <p>你好！我是智能Oncall小助手</p>
+                    <p>你好！我会自动协调知识、数据和任务 Agent</p>
                 </div>
                 <div class="chat-messages" id="chatMessages">
                 </div>
@@ -59,7 +51,7 @@
                 <div class="chat-input-container">
                     <div class="input-group-wrapper">
                         <div class="input-wrapper">
-                            <input type="text" id="messageInput" placeholder="问问智能OnCall助手" maxlength="1000" class="message-input">
+                            <input type="text" id="messageInput" placeholder="询问知识、数据或复杂任务" maxlength="4000" class="message-input">
                             <div class="input-bottom-bar">
                                 <div class="tools-btn-wrapper">
                                     <button class="tools-btn" id="toolsBtn" title="更多选项">
@@ -122,7 +114,7 @@
     <div id="loadingOverlay" class="loading-overlay">
         <div class="loading-content">
             <div class="loading-spinner"></div>
-            <div class="loading-text">智能运维分析中，请稍候...</div>
+            <div class="loading-text">Agent 协同处理中，请稍候...</div>
             <div class="loading-subtext">后端正在处理，请耐心等待</div>
         </div>
     </div>

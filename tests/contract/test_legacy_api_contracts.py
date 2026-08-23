@@ -6,25 +6,57 @@ from typing import Any
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from app.models.agent import (
+    AgentRunResponse,
+    AgentThreadDeleteResponse,
+    AgentThreadResponse,
+)
+from app.services.event_service import AgentEventService
+
 chat_api = import_module("app.api.chat")
 aiops_api = import_module("app.api.aiops")
 
 
-class FakeRagAgentService:
-    async def query(self, question: str, session_id: str) -> str:
-        return f"answer:{session_id}:{question}"
+class FakeMultiAgentService:
+    def __init__(self) -> None:
+        self.events = AgentEventService()
 
-    async def query_stream(
-        self, question: str, session_id: str
-    ) -> AsyncGenerator[dict[str, Any], None]:
-        yield {"type": "content", "data": "hello"}
-        yield {"type": "complete", "data": {"answer": "hello"}}
+    async def run(self, request) -> AgentRunResponse:
+        return AgentRunResponse(
+            run_id="run-json",
+            thread_id=request.thread_id,
+            status="completed",
+            answer=f"answer:{request.thread_id}:{request.message}",
+            termination_reason="fast_path",
+        )
 
-    def clear_session(self, session_id: str) -> bool:
-        return True
+    async def stream(self, request):
+        yield self.events.create(
+            run_id="run-stream",
+            thread_id=request.thread_id,
+            event_type="content_delta",
+            data={"content": "hello"},
+        )
+        yield self.events.create(
+            run_id="run-stream",
+            thread_id=request.thread_id,
+            event_type="run_completed",
+            data={
+                "result": AgentRunResponse(
+                    run_id="run-stream",
+                    thread_id=request.thread_id,
+                    status="completed",
+                    answer="hello",
+                    termination_reason="fast_path",
+                ).model_dump(mode="json")
+            },
+        )
 
-    def get_session_history(self, session_id: str) -> list[dict[str, str]]:
-        return []
+    async def clear_thread(self, thread_id: str) -> AgentThreadDeleteResponse:
+        return AgentThreadDeleteResponse(thread_id=thread_id, deleted_runs=1)
+
+    async def get_thread(self, thread_id: str) -> AgentThreadResponse:
+        return AgentThreadResponse(thread_id=thread_id)
 
 
 class FakeAIOpsService:
@@ -44,7 +76,7 @@ class FakeAIOpsService:
 
 
 def build_client(monkeypatch: Any) -> TestClient:
-    monkeypatch.setattr(chat_api, "rag_agent_service", FakeRagAgentService())
+    monkeypatch.setattr(chat_api, "multi_agent_service", FakeMultiAgentService())
     monkeypatch.setattr(aiops_api, "aiops_service", FakeAIOpsService())
     app = FastAPI()
     app.include_router(chat_api.router, prefix="/api")

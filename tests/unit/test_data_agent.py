@@ -90,6 +90,27 @@ async def test_data_agent_sanitizes_successful_tool_evidence() -> None:
     assert "[REDACTED]" in result.evidence[0].content
 
 
+async def test_data_agent_emits_safe_tool_lifecycle_events() -> None:
+    planner = FakePlanner(
+        [DataToolCall(tool_name="successful_query", arguments={"query": "private-input"})]
+    )
+    agent = DataAgent(registry=make_registry(), planner=planner)
+    events: list[dict[str, Any]] = []
+
+    result = await agent.run(make_task(), event_sink=events.append)
+
+    assert result.status == "success"
+    assert [event["type"] for event in events] == ["tool_started", "tool_completed"]
+    assert events[0]["data"] == {
+        "tool_name": "successful_query",
+        "server_name": None,
+        "status": "running",
+    }
+    assert events[1]["data"]["status"] == "success"
+    assert events[1]["data"]["duration_ms"] >= 0
+    assert "private-input" not in str(events)
+
+
 async def test_data_agent_returns_partial_when_one_tool_fails() -> None:
     planner = FakePlanner(
         [

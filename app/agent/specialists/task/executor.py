@@ -1,8 +1,10 @@
 """Task step executor with bounded delegation to Specialist Agents."""
 
-from typing import Protocol
+from collections.abc import Callable
+from typing import Any, Protocol
 
 from langchain_core.language_models.chat_models import BaseChatModel
+from langgraph.config import get_stream_writer
 
 from app.agent.contracts import AgentTask, TaskStepResult
 from app.agent.specialists.data.agent import DataAgent, data_agent
@@ -68,11 +70,10 @@ class SpecialistTaskStepExecutor:
             constraints=task.constraints,
             preferred_tools=route.preferred_tools,
         )
-        result = (
-            await self._knowledge.run(subtask)
-            if route.target == "knowledge"
-            else await self._data.run(subtask)
-        )
+        if route.target == "knowledge":
+            result = await self._knowledge.run(subtask)
+        else:
+            result = await self._data.run(subtask, event_sink=self._stream_writer())
         return TaskStepResult(
             step=step,
             status=result.status,
@@ -87,3 +88,10 @@ class SpecialistTaskStepExecutor:
         if not past_steps:
             return "无"
         return "\n".join(f"- {item.step} [{item.status}]: {item.summary}" for item in past_steps)
+
+    @staticmethod
+    def _stream_writer() -> Callable[[dict[str, Any]], None] | None:
+        try:
+            return get_stream_writer()
+        except RuntimeError:
+            return None

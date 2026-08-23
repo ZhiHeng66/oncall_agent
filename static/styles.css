@@ -431,6 +431,56 @@ body {
     box-shadow: none;
 }
 
+.agent-timeline {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 0 0 10px 18px;
+}
+
+.timeline-item {
+    padding: 4px 9px;
+    border-radius: 999px;
+    background: #eef3fd;
+    color: #315a9b;
+    font-size: 0.75rem;
+    border: 1px solid #d9e4f8;
+}
+
+.timeline-step_failed,
+.timeline-run_failed {
+    background: #fce8e6;
+    color: #b3261e;
+    border-color: #f5c2bd;
+}
+
+.agent-sources {
+    display: grid;
+    gap: 8px;
+    margin: 12px 0 0 18px;
+}
+
+.sources-title {
+    color: #5f6368;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.source-card {
+    display: grid;
+    gap: 3px;
+    padding: 9px 11px;
+    border-radius: 10px;
+    background: #f8f9fa;
+    border: 1px solid #e8eaed;
+    color: #5f6368;
+    font-size: 0.78rem;
+}
+
+.source-card strong {
+    color: #202124;
+}
+
 /* Markdown渲染样式 */
 .message-content h1, .message-content h2, .message-content h3,
 .message-content h4, .message-content h5, .message-content h6 {

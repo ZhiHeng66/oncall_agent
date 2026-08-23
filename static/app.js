@@ -1,8 +1,49 @@
-// SuperBizAgent 前端应用
+class SSEEventParser {
+    async consume(response, onEvent) {
+        if (!response.body) {
+            throw new Error('浏览器未提供可读取的响应流');
+        }
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        try {
+            while (true) {
+                const { done, value } = await reader.read();
+                buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+                let boundary = buffer.search(/\r?\n\r?\n/);
+                while (boundary >= 0) {
+                    const block = buffer.slice(0, boundary);
+                    const separator = buffer.slice(boundary).match(/^\r?\n\r?\n/)[0];
+                    buffer = buffer.slice(boundary + separator.length);
+                    this.parseBlock(block, onEvent);
+                    boundary = buffer.search(/\r?\n\r?\n/);
+                }
+                if (done) {
+                    if (buffer.trim()) this.parseBlock(buffer, onEvent);
+                    return;
+                }
+            }
+        } finally {
+            reader.releaseLock();
+        }
+    }
+
+    parseBlock(block, onEvent) {
+        const dataLines = block
+            .split(/\r?\n/)
+            .filter((line) => line.startsWith('data:'))
+            .map((line) => line.slice(5).trimStart());
+        if (!dataLines.length) return;
+        onEvent(JSON.parse(dataLines.join('\n')));
+    }
+}
+
+// 企业知识服务多智能体平台前端应用
 class SuperBizAgentApp {
     constructor() {
-        this.apiBaseUrl = 'http://localhost:9900/api';
-        // 默认使用 SSE 流式接口；“快速”模式仍可由界面菜单手动选择。
+        this.apiBaseUrl = '/api';
+        this.sseParser = new SSEEventParser();
+        // 两种模式只影响传输方式，业务路由统一由 Supervisor 决定。
         this.currentMode = 'stream'; // 'quick' 或 'stream'
         this.sessionId = this.generateSessionId();
         this.isStreaming = false;
@@ -617,7 +658,7 @@ class SuperBizAgentApp {
         // 更新输入框状态
         if (this.messageInput) {
             this.messageInput.disabled = this.isStreaming;
-            this.messageInput.placeholder = '问问智能OnCall助手';
+            this.messageInput.placeholder = '询问知识、数据或复杂任务';
         }
     }
 
@@ -659,7 +700,7 @@ class SuperBizAgentApp {
             if (this.currentMode === 'quick') {
                 await this.sendQuickMessage(message);
             } else if (this.currentMode === 'stream') {
-                await this.sendStreamMessage(message);
+                await this.sendAgentStreamMessage(message);
             }
         } catch (error) {
             console.error('发送消息失败:', error);
@@ -682,14 +723,15 @@ class SuperBizAgentApp {
         const loadingMessage = this.addLoadingMessage('正在思考...');
         
         try {
-            const response = await fetch(`${this.apiBaseUrl}/chat`, {
+            const response = await fetch(`${this.apiBaseUrl}/agent/run`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    Id: this.sessionId,
-                    Question: message
+                    user_id: 'web-user',
+                    thread_id: this.sessionId,
+                    message: message
                 })
             });
 
@@ -698,34 +740,16 @@ class SuperBizAgentApp {
             }
 
             const data = await response.json();
-            console.log('[sendQuickMessage] 响应数据:', JSON.stringify(data));
-            
             // 移除等待提示消息
             if (loadingMessage && loadingMessage.parentNode) {
                 loadingMessage.parentNode.removeChild(loadingMessage);
             }
             
-            // 统一响应格式：检查 data.code 或 data.message 判断请求是否成功
-            if (data.code === 200 || data.message === 'success') {
-                // data.data 是 ChatResponse 对象
-                const chatResponse = data.data;
-                
-                if (chatResponse && chatResponse.success) {
-                    // 成功：添加实际响应消息（即使 answer 为空也显示）
-                    const answer = chatResponse.answer || '（无回复内容）';
-                    this.addMessage('assistant', answer);
-                } else if (chatResponse && chatResponse.errorMessage) {
-                    // 业务错误
-                    throw new Error(chatResponse.errorMessage);
-                } else {
-                    // 兜底：尝试显示任何可用内容
-                    const fallbackAnswer = chatResponse?.answer || chatResponse?.errorMessage || '服务返回了空内容';
-                    this.addMessage('assistant', fallbackAnswer);
-                }
-            } else {
-                // HTTP 成功但业务失败
-                throw new Error(data.message || '请求失败');
+            if (data.status === 'failed') {
+                throw new Error((data.errors || []).join('；') || data.answer || '请求失败');
             }
+            const messageElement = this.addMessage('assistant', data.answer || '（无回复内容）');
+            this.renderAgentSources(messageElement, data.sources || []);
         } catch (error) {
             // 出错时也要移除等待提示消息
             if (loadingMessage && loadingMessage.parentNode) {
@@ -735,7 +759,108 @@ class SuperBizAgentApp {
         }
     }
 
-    // 发送流式消息
+    async sendAgentStreamMessage(message) {
+        const response = await fetch(`${this.apiBaseUrl}/agent/run_stream`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                user_id: 'web-user',
+                thread_id: this.sessionId,
+                message: message
+            })
+        });
+        if (!response.ok) throw new Error(`HTTP错误: ${response.status}`);
+
+        const assistantMessage = this.addMessage('assistant', '', true);
+        const timeline = this.createAgentTimeline(assistantMessage);
+        let fullResponse = '';
+        let terminalReceived = false;
+
+        await this.sseParser.consume(response, (event) => {
+            if (event.type === 'content_delta') {
+                fullResponse += event.data?.content || '';
+                const content = assistantMessage.querySelector('.message-content');
+                content.innerHTML = this.renderMarkdown(fullResponse);
+                this.highlightCodeBlocks(content);
+            } else if (event.type === 'run_completed') {
+                terminalReceived = true;
+                const result = event.data?.result || {};
+                fullResponse = result.answer || fullResponse;
+                this.renderAgentSources(assistantMessage, result.sources || []);
+                this.handleStreamComplete(assistantMessage, fullResponse);
+            } else if (event.type === 'run_failed') {
+                terminalReceived = true;
+                const result = event.data?.result || {};
+                const error = event.data?.error || (result.errors || []).join('；') || result.answer;
+                fullResponse = `执行失败：${error || '未知错误'}`;
+                this.handleStreamComplete(assistantMessage, fullResponse);
+            } else {
+                this.appendTimelineEvent(timeline, event);
+            }
+            this.scrollToBottom();
+        });
+
+        if (!terminalReceived) {
+            throw new Error('响应流未返回终态事件');
+        }
+    }
+
+    createAgentTimeline(messageElement) {
+        const timeline = document.createElement('div');
+        timeline.className = 'agent-timeline';
+        const wrapper = messageElement.querySelector('.message-content-wrapper');
+        wrapper.insertBefore(timeline, wrapper.firstChild);
+        return timeline;
+    }
+
+    appendTimelineEvent(timeline, event) {
+        const labels = {
+            run_started: '运行开始',
+            route_decided: `Supervisor 路由：${event.data?.mode || ''}`,
+            agent_started: `${event.agent || 'Agent'} 开始执行`,
+            agent_completed: `${event.agent || 'Agent'} 执行完成`,
+            plan_created: 'Task Agent 已制定计划',
+            step_started: `开始步骤：${event.data?.step || ''}`,
+            tool_started: `调用工具：${event.data?.tool_name || ''}`,
+            tool_completed: `工具完成：${event.data?.tool_name || ''}`,
+            step_completed: `完成步骤：${event.data?.step || ''}`,
+            step_failed: `步骤失败：${event.data?.step || ''}`,
+            review_completed: event.data?.passed ? 'Reviewer 检查通过' : 'Reviewer 要求返工'
+        };
+        const item = document.createElement('div');
+        item.className = `timeline-item timeline-${event.type}`;
+        item.textContent = labels[event.type] || event.type;
+        timeline.appendChild(item);
+    }
+
+    renderAgentSources(messageElement, sources) {
+        if (!messageElement || !sources.length) return;
+        const wrapper = messageElement.querySelector('.message-content-wrapper');
+        let container = wrapper.querySelector('.agent-sources');
+        if (!container) {
+            container = document.createElement('div');
+            container.className = 'agent-sources';
+            wrapper.appendChild(container);
+        }
+        container.innerHTML = '';
+        const title = document.createElement('div');
+        title.className = 'sources-title';
+        title.textContent = '来源';
+        container.appendChild(title);
+        sources.forEach((source, index) => {
+            const card = document.createElement('div');
+            card.className = 'source-card';
+            const name = document.createElement('strong');
+            name.textContent = `[来源${index + 1}] ${source.source_name}`;
+            const excerpt = document.createElement('span');
+            excerpt.textContent = source.excerpt || '';
+            card.appendChild(name);
+            card.appendChild(excerpt);
+            container.appendChild(card);
+        });
+    }
+
+    // 旧 Chat SSE 解析器保留在兼容期；当前页面不再调用。
     async sendStreamMessage(message) {
         try {
             const response = await fetch(`${this.apiBaseUrl}/chat_stream`, {

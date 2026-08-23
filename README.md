@@ -1,18 +1,20 @@
-# SuperBizAgent
+# 企业知识服务多智能体协同平台
 
-> 企业级智能对话和运维助手，支持 RAG 知识库问答和 AIOps 智能诊断
+> 基于 Supervisor-Specialist、LangGraph、Milvus RAG 与只读 MCP 工具的多智能体应用。
 
-[![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/Python-3.11--3.13-blue.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.109+-green.svg)](https://fastapi.tiangolo.com/)
 [![LangChain](https://img.shields.io/badge/LangChain-latest-orange.svg)](https://www.langchain.com/)
 
 ## ✨ 核心特性
 
-- 🤖 **智能对话** - LangChain 多轮对话 + 流式输出
-- 📚 **RAG 问答** - 向量检索增强，支持文档上传、自动建立向量索引、自动更新知识库
-- 🔧 **AIOps 诊断** - Plan-Execute-Replan 自动故障诊断和根因分析
-- 🌐 **Web 界面** - 现代化 UI，支持多种对话模式：快速问答/流式对话
-- 🔌 **MCP 集成** - 日志查询和监控数据工具接入
+- **Supervisor 自动路由**：支持 direct、single、parallel 和 complex 四种路径。
+- **Knowledge Agent**：Milvus 检索、标准化证据和来源引用。
+- **Data Agent**：通过严格白名单调用只读本地/MCP 数据工具。
+- **Task Agent**：使用有限 Plan-Execute-Replan 子图执行有依赖的复杂任务。
+- **Reviewer Agent**：检查证据、引用和错误披露，最多定向返工一次。
+- **统一 API 与 SSE**：提供 JSON 响应、Agent 时间线、来源和明确终态。
+- **兼容接口**：迁移期保留 `/api/chat`、`/api/chat_stream` 和 `/api/aiops`。
 
 ## 🛠️ 技术栈
 
@@ -24,7 +26,7 @@
 ## 🚀 快速开始
 
 ### 环境要求
-- Python 3.10+
+- Python 3.11 至 3.13
 - 阿里云 DashScope API Key ([获取地址](https://dashscope.aliyun.com/))
 
 ### 安装和启动
@@ -133,32 +135,43 @@ python -c "import requests, os, time; [requests.post('http://localhost:9900/api/
 
 | 功能 | 方法 | 路径 | 说明 |
 |------|------|------|------|
-| 普通对话 | POST | `/api/chat` | 一次性返回 |
-| 流式对话 | POST | `/api/chat_stream` | SSE 流式输出 |
-| AIOps 诊断 | POST | `/api/aiops` | 自动故障诊断（流式） |
+| 统一 Agent 执行 | POST | `/api/agent/run` | Supervisor 自动路由并返回结构化结果 |
+| 统一 Agent 流 | POST | `/api/agent/run_stream` | 统一 SSE envelope 和执行时间线 |
+| 查询运行 | GET | `/api/agent/runs/{run_id}` | 查询当前进程内已完成运行 |
+| 查询线程 | GET | `/api/agent/threads/{thread_id}` | 查询当前进程内运行和可见消息 |
+| 清理线程 | DELETE | `/api/agent/threads/{thread_id}` | 清理当前进程内线程状态 |
+| 旧普通对话 | POST | `/api/chat` | 兼容适配到统一 Agent Service |
+| 旧流式对话 | POST | `/api/chat_stream` | 兼容旧 content/done 事件 |
+| AIOps 兼容入口 | POST | `/api/aiops` | 已标记 deprecated，暂用 Task Agent |
 | 文件上传 | POST | `/api/upload` | 上传并索引文档 |
 | 健康检查 | GET | `/api/health` | 服务状态检查 |
 
 ### 使用示例
 
 ```bash
-# 普通对话
+# 统一 JSON 接口
+curl -X POST "http://localhost:9900/api/agent/run" \
+  -H "Content-Type: application/json" \
+  -d '{"user_id":"user-001","thread_id":"thread-001","message":"查询内部发布规范"}'
+
+# 统一 SSE 接口
+curl -X POST "http://localhost:9900/api/agent/run_stream" \
+  -H "Content-Type: application/json" \
+  -d '{"user_id":"user-001","thread_id":"thread-001","message":"结合制度和当前数据给出分析"}' \
+  --no-buffer
+
+# 旧 Chat 兼容接口
 curl -X POST "http://localhost:9900/api/chat" \
   -H "Content-Type: application/json" \
-  -d '{"Id":"session-123","Question":"你好"}'
-
-# 流式对话
-curl -X POST "http://localhost:9900/api/chat_stream" \
-  -H "Content-Type: application/json" \
-  -d '{"Id":"session-123","Question":"你好"}' \
-  --no-buffer
-
-# AIOps 诊断
-curl -X POST "http://localhost:9900/api/aiops" \
-  -H "Content-Type: application/json" \
-  -d '{"session_id":"session-123"}' \
-  --no-buffer
+  -d '{"Id":"thread-001","Question":"你好"}'
 ```
+
+统一 SSE 事件至少包含 `event_id`、`run_id`、`thread_id`、`type`、`timestamp`
+和 `data`。每个流只产生一个 `run_completed` 或 `run_failed` 终态事件。浏览器断开后，
+服务会关闭对应异步事件生成器，不再继续向该客户端生成事件。
+
+运行和线程查询当前保存在开发环境 `MemorySaver`/进程内存中，服务重启后不会恢复，
+不能视为持久化存储。
 
 ## 📁 项目结构
 
@@ -170,14 +183,17 @@ super_biz_agent_py/
 │   ├── config.py                           # 配置管理（环境变量、MCP 服务器配置）
 │   ├── api/                                # API 路由层
 │   │   ├── __init__.py
-│   │   ├── chat.py                         # 对话接口（RAG 聊天）
-│   │   ├── aiops.py                        # AIOps 接口（故障诊断）
+│   │   ├── agent.py                        # 统一 Agent JSON/SSE 接口
+│   │   ├── chat.py                         # 旧 Chat 兼容适配
+│   │   ├── aiops.py                        # 已废弃标记的 Task 兼容入口
 │   │   ├── file.py                         # 文件管理（文档上传）
 │   │   └── health.py                       # 健康检查（服务状态）
 │   ├── services/                           # 业务服务层
 │   │   ├── __init__.py
-│   │   ├── rag_agent_service.py            # RAG Agent（LangGraph 状态图）
-│   │   ├── aiops_service.py                # AIOps 服务（计划-执行-重规划）
+│   │   ├── multi_agent_service.py          # 统一执行、事件与运行查询
+│   │   ├── event_service.py                # 安全 SSE 事件信封
+│   │   ├── rag_agent_service.py            # 旧 RAG 服务（兼容期保留）
+│   │   ├── aiops_service.py                # 旧 AIOps 到 Task Agent 的适配
 │   │   ├── vector_store_manager.py         # 向量存储管理器
 │   │   ├── vector_embedding_service.py     # 向量embedding服务
 │   │   ├── vector_index_service.py         # 向量索引服务
@@ -185,16 +201,17 @@ super_biz_agent_py/
 │   │   └── document_splitter_service.py    # 文档分割服务
 │   ├── agent/                              # Agent 模块
 │   │   ├── __init__.py
+│   │   ├── graph.py                        # 顶层 Supervisor-Specialist 图
+│   │   ├── state.py                        # 顶层状态与 Reducer
+│   │   ├── contracts.py                    # 跨 Agent 结构化契约
 │   │   ├── mcp_client.py                   # MCP 客户端（工具调用）
-│   │   └── aiops/                          # AIOps 核心逻辑
-│   │       ├── __init__.py
-│   │       ├── planner.py                  # 计划制定器
-│   │       ├── executor.py                 # 步骤执行器
-│   │       ├── replanner.py                # 重规划器
-│   │       ├── state.py                    # 状态定义
-│   │       └── utils.py                    # 工具函数
+│   │   ├── supervisor/                     # Supervisor Agent
+│   │   ├── specialists/                    # Knowledge/Data/Task/Reviewer
+│   │   ├── runtime/                        # 限制与 Checkpointer 工厂
+│   │   └── aiops/                          # 旧模块导入兼容层
 │   ├── models/                             # 数据模型层
 │   │   ├── __init__.py
+│   │   ├── agent.py                        # 统一 API 和 SSE 模型
 │   │   ├── aiops.py                        # AIOps 模型
 │   │   ├── document.py                     # 文档模型
 │   │   ├── request.py                      # 请求模型
@@ -242,7 +259,7 @@ super_biz_agent_py/
 # 阿里云LLM DashScope 配置（必填）
 # 秘钥管理： https://bailian.console.aliyun.com/cn-beijing/?spm=5176.29597918.J_SEsSjsNv72yRuRFS2VknO.2.61ac133ccTVQLw&tab=demohouse#/api-key
 DASHSCOPE_API_KEY=your-api-key （配置你自己的秘钥）
-DASHSCOPE_API_BASE=https://dashscope.aliyuncs.com/compatible-mode/v1  # 不配置则默认会使用新加坡站点
+DASHSCOPE_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
 DASHSCOPE_MODEL=qwen-max
 
 # Milvus 配置
@@ -255,37 +272,21 @@ CHUNK_MAX_SIZE=800
 CHUNK_OVERLAP=100
 ```
 
-## 🎯 AIOps 智能运维
+## 旧 AIOps 兼容入口
 
-基于 **Plan-Execute-Replan** 模式实现自动故障诊断。
+`/api/aiops` 已在 OpenAPI 中标记为 deprecated。它把固定运维请求适配到通用 Task Agent，
+用于迁移期间兼容旧调用方；新功能应使用 `/api/agent/run` 或 `/api/agent/run_stream`。
 
-### 核心特性
-- ✅ 自动制定诊断计划（Planner）
-- ✅ 智能工具调用（Executor）
-- ✅ 动态调整步骤（Replanner）
-- ✅ 流式输出诊断过程
-- ✅ 生成结构化报告
-
-### 快速测试
+### 兼容性测试
 
 ```bash
 # 服务已通过 make init 自动启动
 # 如需重启服务：make restart
 
-# 访问 Web 界面，点击"智能运维与诊断工具"
-# 或使用 API
 curl -X POST "http://localhost:9900/api/aiops" \
   -H "Content-Type: application/json" \
   -d '{"session_id":"test"}' \
   --no-buffer
-```
-
-### 诊断流程
-```
-1. Planner 制定计划 → 生成 4-6 个诊断步骤
-2. Executor 执行步骤 → 调用 MCP 工具（日志查询、监控数据）
-3. Replanner 评估结果 → 决定继续/调整/生成报告
-4. 输出诊断报告 → 根因分析 + 运维建议
 ```
 
 ## 📝 开发指南

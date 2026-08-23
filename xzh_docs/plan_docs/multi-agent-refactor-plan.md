@@ -5,11 +5,12 @@
 > 文档状态：渐进实施中的架构路线图
 > 适用目标：Agent 应用开发岗位的项目建设、演示与面试讲解
 
-> 实施进度（2026-08-23）：M1（阶段 0～1）、M2（阶段 2～4）与 M3（阶段 5～6）
-> 已完成并通过离线测试、Ruff 和 Mypy 验收。实际变更与限制见
+> 实施进度（2026-08-23）：M1（阶段 0～1）、M2（阶段 2～4）、M3（阶段 5～6）
+> 与 M4（阶段 7）已完成并通过离线测试、Ruff 和 Mypy 验收。实际变更与限制见
 > `xzh_docs/handoff_docs/2026-08-23-m1-implementation-handoff.md` 与
 > `xzh_docs/handoff_docs/2026-08-23-m2-implementation-handoff.md`、
-> `xzh_docs/handoff_docs/2026-08-23-m3-implementation-handoff.md`。M4 及后续能力仍为计划中。
+> `xzh_docs/handoff_docs/2026-08-23-m3-implementation-handoff.md`、
+> `xzh_docs/handoff_docs/2026-08-23-m4-implementation-handoff.md`。M5 仍为计划中。
 
 ## 1. 改造结论
 
@@ -812,6 +813,8 @@ DELETE /api/agent/threads/{thread_id}
 - 对无证据数字、遗漏工具错误等预设坏样例能够判定不通过。
 
 ### 阶段 7：统一 API、SSE 与前端
+
+> 实施状态（2026-08-23）：已完成，验收证据见 M4 交接文档。
 
 **目标：** 对外形成一个多智能体产品入口。
 

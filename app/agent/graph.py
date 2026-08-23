@@ -2,10 +2,11 @@
 
 import asyncio
 import time
-from collections.abc import Awaitable, Callable
+from collections.abc import AsyncGenerator, Awaitable, Callable
 from typing import Any, Protocol
 from uuid import uuid4
 
+from langgraph.config import get_stream_writer
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import Send
 
@@ -63,8 +64,21 @@ class Specialist(Protocol):
     async def run(self, task: AgentTask) -> AgentResult: ...
 
 
+class DataSpecialist(Protocol):
+    async def run(
+        self,
+        task: AgentTask,
+        *,
+        event_sink: Callable[[dict[str, Any]], None] | None = None,
+    ) -> AgentResult: ...
+
+
 class TaskSpecialist(Protocol):
     async def run(self, task: AgentTask, thread_id: str | None = None) -> AgentResult: ...
+
+    def stream(
+        self, task: AgentTask, thread_id: str | None = None
+    ) -> AsyncGenerator[dict[str, Any], None]: ...
 
 
 class MultiAgentGraph:
@@ -74,7 +88,7 @@ class MultiAgentGraph:
         self,
         supervisor: Supervisor = supervisor_agent,
         knowledge: Specialist = knowledge_agent,
-        data: Specialist = data_agent,
+        data: DataSpecialist = data_agent,
         task: TaskSpecialist = task_agent,
         reviewer: Reviewer = reviewer_agent,
         limits: RuntimeLimits = runtime_limits,
@@ -133,6 +147,18 @@ class MultiAgentGraph:
             state["review_result"],
             round_number,
         )
+        get_stream_writer()(
+            {
+                "type": "route_decided",
+                "agent": "supervisor",
+                "data": {
+                    "mode": decision.mode,
+                    "target_agents": decision.target_agents,
+                    "reason_summary": decision.reason_summary,
+                    "round": round_number,
+                },
+            }
+        )
         return {
             "route_decision": decision,
             "pending_tasks": decision.tasks,
@@ -169,14 +195,52 @@ class MultiAgentGraph:
         )
 
     async def data_node(self, state: MultiAgentState) -> dict[str, Any]:
-        return await self._dispatch("data", state, lambda task: self._data.run(task))
+        writer = get_stream_writer()
+        return await self._dispatch(
+            "data",
+            state,
+            lambda task: self._data.run(task, event_sink=writer),
+        )
 
     async def task_node(self, state: MultiAgentState) -> dict[str, Any]:
-        return await self._dispatch(
-            "task",
-            state,
-            lambda task: self._task.run(task, thread_id=state["thread_id"]),
+        task = state["dispatch_task"]
+        if task is None:
+            raise ValueError("task dispatch task is missing")
+        writer = get_stream_writer()
+        writer(
+            {
+                "type": "agent_started",
+                "agent": "task",
+                "data": {"task_id": task.task_id, "round": state["supervisor_rounds"]},
+            }
         )
+        started = time.perf_counter()
+        result: AgentResult | None = None
+        try:
+            async with asyncio.timeout(self._limits.agent_timeout_seconds):
+                async for event in self._task.stream(task, thread_id=state["thread_id"]):
+                    if event.get("type") in {"run_completed", "run_failed"}:
+                        result = AgentResult.model_validate(event["result"])
+                        continue
+                    writer(
+                        {
+                            "type": event.get("type", "step_completed"),
+                            "agent": "task",
+                            "data": {key: value for key, value in event.items() if key != "type"},
+                        }
+                    )
+            if result is None:
+                raise RuntimeError("Task Agent 流未返回终态结果")
+        except Exception as exc:
+            detail = sanitize_error_message(str(exc))
+            result = AgentResult(
+                agent_name="task",
+                task_id=task.task_id,
+                status="failed",
+                summary="task Agent 执行失败。",
+                errors=[detail],
+            )
+        return self._finish_dispatch("task", task, result, state, started, writer)
 
     async def _dispatch(
         self,
@@ -188,6 +252,14 @@ class MultiAgentGraph:
         if task is None:
             raise ValueError(f"{agent_name} dispatch task is missing")
         started = time.perf_counter()
+        writer = get_stream_writer()
+        writer(
+            {
+                "type": "agent_started",
+                "agent": agent_name,
+                "data": {"task_id": task.task_id, "round": state["supervisor_rounds"]},
+            }
+        )
         try:
             async with asyncio.timeout(self._limits.agent_timeout_seconds):
                 result = await invoke(task)
@@ -200,6 +272,17 @@ class MultiAgentGraph:
                 summary=f"{agent_name} Agent 执行失败。",
                 errors=[detail],
             )
+        return self._finish_dispatch(agent_name, task, result, state, started, writer)
+
+    @staticmethod
+    def _finish_dispatch(
+        agent_name: AgentTarget,
+        task: AgentTask,
+        result: AgentResult,
+        state: MultiAgentState,
+        started: float,
+        writer: Callable[[dict[str, Any]], None],
+    ) -> dict[str, Any]:
         duration_ms = (time.perf_counter() - started) * 1000
         record = DispatchRecord(
             round=state["supervisor_rounds"],
@@ -207,6 +290,18 @@ class MultiAgentGraph:
             task_id=task.task_id,
             status=result.status,
             duration_ms=duration_ms,
+        )
+        writer(
+            {
+                "type": "agent_completed",
+                "agent": agent_name,
+                "data": {
+                    "task_id": task.task_id,
+                    "round": state["supervisor_rounds"],
+                    "status": result.status,
+                    "duration_ms": duration_ms,
+                },
+            }
         )
         return {"agent_results": [result], "dispatch_records": [record]}
 
@@ -243,6 +338,7 @@ class MultiAgentGraph:
     async def reviewer_node(self, state: MultiAgentState) -> dict[str, Any]:
         evidence = self._collect_evidence(state["agent_results"])
         errors = self._collect_errors(state["agent_results"], state["workflow_errors"])
+        writer = get_stream_writer()
         try:
             review = await self._reviewer.review(
                 state["user_query"],
@@ -259,13 +355,29 @@ class MultiAgentGraph:
                 issues=["Reviewer 执行失败，无法确认候选答案质量。"],
                 retry_target="none",
             )
+            writer(self._review_event(review))
             return {
                 "review_result": review,
                 "review_history": [review],
                 "workflow_errors": [detail],
                 "status": "partial" if state["status"] != "failed" else "failed",
             }
+        writer(self._review_event(review))
         return {"review_result": review, "review_history": [review]}
+
+    @staticmethod
+    def _review_event(review: ReviewResult) -> dict[str, Any]:
+        return {
+            "type": "review_completed",
+            "agent": "reviewer",
+            "data": {
+                "passed": review.passed,
+                "issues": review.issues,
+                "retry_target": review.retry_target,
+                "completeness_score": review.completeness_score,
+                "groundedness_score": review.groundedness_score,
+            },
+        }
 
     @staticmethod
     def prepare_retry_node(state: MultiAgentState) -> dict[str, Any]:
@@ -323,10 +435,7 @@ class MultiAgentGraph:
         try:
             result = await self.graph.ainvoke(
                 self._initial_state(user_query, user_id, thread_id, resolved_run_id),
-                config={
-                    "configurable": {"thread_id": f"{thread_id}:{resolved_run_id}"},
-                    "recursion_limit": self._limits.graph_recursion_limit,
-                },
+                config=self._config(thread_id, resolved_run_id),
             )
         except Exception as exc:
             detail = sanitize_error_message(str(exc))
@@ -339,6 +448,47 @@ class MultiAgentGraph:
                 termination_reason="graph_failed",
             )
         return self._to_result(result)
+
+    async def stream(
+        self,
+        user_query: str,
+        *,
+        user_id: str,
+        thread_id: str,
+        run_id: str | None = None,
+    ) -> AsyncGenerator[dict[str, Any], None]:
+        resolved_run_id = run_id or str(uuid4())
+        graph_config = self._config(thread_id, resolved_run_id)
+        try:
+            async for mode, event in self.graph.astream(
+                self._initial_state(user_query, user_id, thread_id, resolved_run_id),
+                config=graph_config,
+                stream_mode=["custom", "updates"],
+            ):
+                if mode == "custom":
+                    yield event
+            snapshot = self.graph.get_state(graph_config)
+            result = self._to_result(snapshot.values)
+        except Exception as exc:
+            detail = sanitize_error_message(str(exc))
+            result = MultiAgentRunResult(
+                run_id=resolved_run_id,
+                thread_id=thread_id,
+                status="failed",
+                final_answer="Multi-Agent 图执行失败。",
+                errors=[detail],
+                termination_reason="graph_failed",
+            )
+        yield {"type": "graph_completed", "result": result.model_dump(mode="json")}
+
+    async def delete_run_state(self, thread_id: str, run_id: str) -> None:
+        await self.checkpointer.adelete_thread(f"{thread_id}:{run_id}")
+
+    def _config(self, thread_id: str, run_id: str) -> dict[str, Any]:
+        return {
+            "configurable": {"thread_id": f"{thread_id}:{run_id}"},
+            "recursion_limit": self._limits.graph_recursion_limit,
+        }
 
     @staticmethod
     def _initial_state(

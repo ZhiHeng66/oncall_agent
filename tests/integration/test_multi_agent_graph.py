@@ -56,7 +56,7 @@ class FakeAgent:
         self.errors = errors or []
         self.calls = 0
 
-    async def run(self, task: AgentTask) -> AgentResult:
+    async def run(self, task: AgentTask, *, event_sink=None) -> AgentResult:
         self.calls += 1
         source_type = "knowledge" if self.name == "knowledge" else "tool"
         citation = " [来源1]" if self.name == "knowledge" else ""
@@ -75,6 +75,25 @@ class FakeAgent:
 class FakeTaskAgent(FakeAgent):
     async def run(self, task: AgentTask, thread_id: str | None = None) -> AgentResult:
         return await super().run(task)
+
+    async def stream(self, task: AgentTask, thread_id: str | None = None):
+        result = await self.run(task, thread_id=thread_id)
+        yield {"type": "run_completed", "result": result.model_dump(mode="json")}
+
+
+class TimelineTaskAgent(FakeTaskAgent):
+    async def stream(self, task: AgentTask, thread_id: str | None = None):
+        yield {"type": "plan_created", "plan": ["collect"]}
+        yield {"type": "step_started", "step": "collect", "step_index": 1}
+        yield {
+            "type": "step_completed",
+            "step": "collect",
+            "step_index": 1,
+            "status": "success",
+            "summary": "collected",
+        }
+        result = await self.run(task, thread_id=thread_id)
+        yield {"type": "run_completed", "result": result.model_dump(mode="json")}
 
 
 class NoopReviewer:
@@ -106,18 +125,18 @@ class ConcurrentAgent(FakeAgent):
         super().__init__(name)
         self.shared = shared
 
-    async def run(self, task: AgentTask) -> AgentResult:
+    async def run(self, task: AgentTask, *, event_sink=None) -> AgentResult:
         self.shared["started"] = int(self.shared["started"]) + 1
         if self.shared["started"] == 2:
             self.shared["both_started"].set()
         await asyncio.wait_for(self.shared["both_started"].wait(), timeout=0.2)
-        return await super().run(task)
+        return await super().run(task, event_sink=event_sink)
 
 
 class SlowAgent(FakeAgent):
-    async def run(self, task: AgentTask) -> AgentResult:
+    async def run(self, task: AgentTask, *, event_sink=None) -> AgentResult:
         await asyncio.sleep(0.1)
-        return await super().run(task)
+        return await super().run(task, event_sink=event_sink)
 
 
 class RaisingSupervisor:
@@ -331,3 +350,34 @@ async def test_unexpected_graph_failure_returns_clean_failed_terminal() -> None:
     assert result.status == "failed"
     assert result.termination_reason == "graph_failed"
     assert "private-supervisor-token" not in result.errors[0]
+
+
+async def test_top_level_stream_propagates_task_timeline_and_one_graph_terminal() -> None:
+    graph = graph_for(
+        [decision("complex", ["task"])],
+        task=TimelineTaskAgent("task"),
+    )
+
+    events = [
+        event
+        async for event in graph.stream(
+            "complex",
+            user_id="user",
+            thread_id="thread",
+            run_id="timeline",
+        )
+    ]
+
+    event_types = [event["type"] for event in events]
+    assert event_types == [
+        "route_decided",
+        "agent_started",
+        "plan_created",
+        "step_started",
+        "step_completed",
+        "agent_completed",
+        "review_completed",
+        "graph_completed",
+    ]
+    assert sum(event["type"] == "graph_completed" for event in events) == 1
+    assert events[-1]["result"]["status"] == "completed"

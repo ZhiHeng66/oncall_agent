@@ -13,7 +13,7 @@ from fastapi.staticfiles import StaticFiles
 from loguru import logger
 
 from app.agent.mcp_client import sanitize_error_message
-from app.api import aiops, chat, file, health
+from app.api import agent, aiops, chat, file, health
 from app.config import config
 from app.core.milvus_client import milvus_manager
 from app.tools.registry import tool_registry
@@ -54,7 +54,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title=config.app_name,
     version=config.app_version,
-    description="基于 LangChain 的智能oncall运维系统",
+    description="基于 Supervisor-Specialist 与 LangGraph 的企业知识服务多智能体平台",
     lifespan=lifespan,
 )
 
@@ -69,9 +69,10 @@ app.add_middleware(
 
 # 注册路由
 app.include_router(health.router, tags=["健康检查"])
+app.include_router(agent.router, prefix="/api", tags=["Multi-Agent"])
 app.include_router(chat.router, prefix="/api", tags=["对话"])
 app.include_router(file.router, prefix="/api", tags=["文件管理"])
-app.include_router(aiops.router, prefix="/api", tags=["AIOps智能运维"])
+app.include_router(aiops.router, prefix="/api", tags=["AIOps兼容接口"])
 
 # 挂载静态文件
 static_dir = "static"

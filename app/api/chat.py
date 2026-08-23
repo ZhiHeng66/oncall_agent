@@ -10,9 +10,10 @@ from loguru import logger
 from sse_starlette.sse import EventSourceResponse
 
 from app.agent.mcp_client import format_exception_chain, sanitize_error_message
+from app.models.agent import AgentRunRequest
 from app.models.request import ChatRequest, ClearRequest
 from app.models.response import ApiResponse, SessionInfoResponse
-from app.services.rag_agent_service import rag_agent_service
+from app.services.multi_agent_service import multi_agent_service
 
 router = APIRouter()
 
@@ -37,15 +38,23 @@ async def chat(request: ChatRequest):
         统一格式的对话响应
     """
     try:
-        logger.info(f"[会话 {request.id}] 收到快速对话请求: {request.question}")
-        answer = await rag_agent_service.query(request.question, session_id=request.id)
+        logger.info(f"[会话 {request.id}] 收到统一 Agent 快速请求")
+        result = await multi_agent_service.run(
+            AgentRunRequest(user_id=request.id, thread_id=request.id, message=request.question)
+        )
 
         logger.info(f"[会话 {request.id}] 快速对话完成")
 
         return {
             "code": 200,
             "message": "success",
-            "data": {"success": True, "answer": answer, "errorMessage": None},
+            "data": {
+                "success": result.status != "failed",
+                "answer": result.answer if result.status != "failed" else None,
+                "errorMessage": (
+                    "；".join(result.errors) or result.answer if result.status == "failed" else None
+                ),
+            },
         }
 
     except Exception as e:
@@ -82,70 +91,47 @@ async def chat_stream(request: ChatRequest):
     Returns:
         SSE 事件流
     """
-    logger.info(f"[会话 {request.id}] 收到流式对话请求: {request.question}")
+    logger.info(f"[会话 {request.id}] 收到统一 Agent 流式请求")
 
     async def event_generator():
         try:
-            async for chunk in rag_agent_service.query_stream(
-                request.question, session_id=request.id
-            ):
-                chunk_type = chunk.get("type", "unknown")
-                chunk_data = chunk.get("data", None)
-
-                # 处理调试类型消息（新增）
-                if chunk_type == "debug":
-                    # 调试信息，可以选择发送或忽略
+            stream_request = AgentRunRequest(
+                user_id=request.id,
+                thread_id=request.id,
+                message=request.question,
+            )
+            async for event in multi_agent_service.stream(stream_request):
+                if event.type == "content_delta":
                     yield {
                         "event": "message",
                         "data": json.dumps(
-                            {
-                                "type": "debug",
-                                "node": chunk.get("node", "unknown"),
-                                "message_type": chunk.get("message_type", "unknown"),
-                            },
+                            {"type": "content", "data": event.data.get("content", "")},
                             ensure_ascii=False,
                         ),
                     }
-                elif chunk_type == "tool_call":
-                    # 发送工具调用事件（可选，前端可以显示工具调用状态）
+                elif event.type == "run_completed":
+                    result = event.data.get("result", {})
                     yield {
                         "event": "message",
                         "data": json.dumps(
-                            {"type": "tool_call", "data": chunk_data}, ensure_ascii=False
+                            {"type": "done", "data": {"answer": result.get("answer", "")}},
+                            ensure_ascii=False,
                         ),
                     }
-                elif chunk_type == "search_results":
-                    # 发送检索结果（可选，前端可以忽略）
+                    break
+                elif event.type == "run_failed":
+                    result = event.data.get("result", {})
+                    detail = (
+                        event.data.get("error")
+                        or "；".join(result.get("errors", []))
+                        or result.get("answer")
+                        or "Agent 执行失败"
+                    )
                     yield {
                         "event": "message",
-                        "data": json.dumps(
-                            {"type": "search_results", "data": chunk_data}, ensure_ascii=False
-                        ),
+                        "data": json.dumps({"type": "error", "data": detail}, ensure_ascii=False),
                     }
-                elif chunk_type == "content":
-                    # 发送内容块 - 关键：data 必须是 JSON 字符串
-                    yield {
-                        "event": "message",
-                        "data": json.dumps(
-                            {"type": "content", "data": chunk_data}, ensure_ascii=False
-                        ),
-                    }
-                elif chunk_type == "complete":
-                    # 发送完成信号
-                    yield {
-                        "event": "message",
-                        "data": json.dumps(
-                            {"type": "done", "data": chunk_data}, ensure_ascii=False
-                        ),
-                    }
-                elif chunk_type == "error":
-                    # 发送错误信息
-                    yield {
-                        "event": "message",
-                        "data": json.dumps(
-                            {"type": "error", "data": str(chunk_data)}, ensure_ascii=False
-                        ),
-                    }
+                    break
 
             logger.info(f"[会话 {request.id}] 流式对话完成")
 
@@ -171,12 +157,12 @@ async def clear_session(request: ClearRequest):
         操作结果
     """
     try:
-        success = rag_agent_service.clear_session(request.session_id)
-        logger.info(f"清空会话: {request.session_id}, 结果: {success}")
+        await multi_agent_service.clear_thread(request.session_id)
+        logger.info(f"清空会话: {request.session_id}")
 
         return ApiResponse(
-            status="success" if success else "error",
-            message="会话已清空" if success else "清空会话失败",
+            status="success",
+            message="会话已清空",
             data=None,
         )
 
@@ -196,10 +182,12 @@ async def get_session_info(session_id: str) -> SessionInfoResponse:
         会话信息
     """
     try:
-        history = rag_agent_service.get_session_history(session_id)
+        thread = await multi_agent_service.get_thread(session_id)
 
         return SessionInfoResponse(
-            session_id=session_id, message_count=len(history), history=history
+            session_id=session_id,
+            message_count=len(thread.history),
+            history=thread.history,
         )
 
     except Exception as e:
