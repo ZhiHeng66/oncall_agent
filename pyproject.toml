@@ -31,6 +31,9 @@ dependencies = [
     "fastmcp>=2.14.0",
     "langchain-qwq>=0.3.4",
     "langgraph-checkpoint-sqlite>=3.0.0",
+    "langgraph-checkpoint-postgres>=3.0.0",
+    "psycopg[binary,pool]>=3.2.0",
+    "alembic>=1.13.0",
 ]
 
 [project.optional-dependencies]
@@ -125,6 +128,9 @@ python_files = ["test_*.py", "*_test.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
 asyncio_mode = "auto"
+markers = [
+    "postgres: requires the isolated PostgreSQL integration database",
+]
 
 [tool.coverage.run]
 source = ["app"]

@@ -4,8 +4,9 @@
 """
 
 import os
-from typing import Any
+from typing import Any, Literal
 
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _ENV_FILE = None if os.getenv("ONCALL_DISABLE_ENV_FILE") == "1" else ".env"
@@ -66,8 +67,12 @@ class Settings(BaseSettings):
     mcp_tool_cache_ttl_seconds: float = 300.0
 
     # Agent 运行限制
-    checkpointer_backend: str = "sqlite"
+    checkpointer_backend: Literal["memory", "sqlite", "postgres"] = "sqlite"
     checkpoint_path: str = "data/multi_agent.sqlite3"
+    database_url: str = ""
+    postgres_pool_min_size: int = Field(default=1, ge=0)
+    postgres_pool_max_size: int = Field(default=10, ge=1)
+    postgres_connect_timeout_seconds: float = Field(default=10.0, gt=0)
     supervisor_max_rounds: int = 4
     task_max_steps: int = 8
     reviewer_max_retries: int = 1
@@ -84,6 +89,14 @@ class Settings(BaseSettings):
     # Prometheus
     prometheus_base_url: str = "http://127.0.0.1:9090"
     prometheus_request_timeout: float = 10.0
+
+    @model_validator(mode="after")
+    def validate_persistence(self) -> "Settings":
+        if self.checkpointer_backend == "postgres" and not self.database_url.strip():
+            raise ValueError("DATABASE_URL is required for the postgres persistence backend")
+        if self.postgres_pool_max_size < self.postgres_pool_min_size:
+            raise ValueError("POSTGRES_POOL_MAX_SIZE must be at least POSTGRES_POOL_MIN_SIZE")
+        return self
 
     @property
     def mcp_servers(self) -> dict[str, dict[str, Any]]:

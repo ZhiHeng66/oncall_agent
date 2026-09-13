@@ -1,6 +1,6 @@
 # 企业知识服务多智能体协同平台
 
-> 基于 Supervisor-Specialist、LangGraph、Milvus RAG 与只读 MCP 工具的多智能体应用。
+> 基于 LangChain 组件与 LangGraph 编排、Supervisor-Specialist、Milvus RAG 和只读 MCP 工具的多智能体应用。
 
 [![Python](https://img.shields.io/badge/Python-3.11--3.13-blue.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.109+-green.svg)](https://fastapi.tiangolo.com/)
@@ -14,7 +14,7 @@
 - **Task Agent**：使用有限 Plan-Execute-Replan 子图执行有依赖的复杂任务。
 - **Reviewer Agent**：检查证据、引用和错误披露，最多定向返工一次。
 - **统一 API 与 SSE**：提供 JSON 响应、Agent 时间线、来源和明确终态。
-- **本地持久化与追踪**：SQLite Checkpointer 支持进程重启恢复，可按 `run_id` 查询安全 trace 和运行指标。
+- **可插拔持久化与追踪**：SQLite 支持本地单实例恢复；PostgreSQL 可选后端支持多个应用实例共享顶层 Checkpoint、运行记录和安全 Trace。
 - **固定离线 Eval**：34 条用例覆盖路由、检索引用契约、工具计划校验、任务终态和 Reviewer；`make eval` 可重复生成同数据集比较报告。
 - **业务演示数据**：产品手册、业务规则、FAQ、交付指南，以及只读工单 MCP 数据源。
 - **兼容接口**：迁移期保留 `/api/chat`、`/api/chat_stream` 和 `/api/aiops`。
@@ -24,6 +24,7 @@
 - **框架**: FastAPI + LangChain + LangGraph
 - **LLM**: 阿里云 DashScope (通义千问)
 - **向量库**: Milvus
+- **持久化**: SQLite（默认本地）/ PostgreSQL（可选共享后端）
 - **工具协议**: MCP (Model Context Protocol)
 
 ## 🚀 快速开始
@@ -184,9 +185,11 @@ curl "http://localhost:9900/api/agent/metrics"
 和 `data`。每个流只产生一个 `run_completed` 或 `run_failed` 终态事件。浏览器断开后，
 服务会关闭对应异步事件生成器，不再继续向该客户端生成事件。
 
-默认使用 `data/multi_agent.sqlite3` 保存 LangGraph Checkpoint、运行索引和安全事件。它适合本地
-演示与单实例重启恢复，不代表多实例生产级持久化。未获得可靠 provider usage 与计价信息时，
-模型调用数、Token 数和 Token 成本返回 `null`，不会伪装为 0。
+默认使用 `data/multi_agent.sqlite3` 保存 Multi-Agent 顶层 LangGraph Checkpoint、运行索引和
+安全事件，适合本地演示与单实例重启恢复。将 `CHECKPOINTER_BACKEND` 设为 `postgres` 并完成
+Schema 初始化后，多个应用实例可以共享这两类状态。Task Agent 子图和旧 RAG 对话链路仍使用
+进程内 Checkpointer，因此这不等于所有兼容链路都已持久化。未获得可靠 provider usage 与
+计价信息时，模型调用数、Token 数和 Token 成本返回 `null`，不会伪装为 0。
 
 ## 📁 项目结构
 
@@ -206,7 +209,8 @@ Oncall_agent/
 │   ├── services/                           # 业务服务层
 │   │   ├── __init__.py
 │   │   ├── multi_agent_service.py          # 统一执行、事件与运行查询
-│   │   ├── run_store.py                    # SQLite/内存运行、线程和 Trace 存储
+│   │   ├── run_store.py                    # 内存/SQLite/PostgreSQL RunStore
+│   │   ├── persistence.py                  # 成对创建 Checkpointer 与 RunStore
 │   │   ├── event_service.py                # 安全 SSE 事件信封
 │   │   ├── rag_agent_service.py            # 旧 RAG 服务（兼容期保留）
 │   │   ├── aiops_service.py                # 旧 AIOps 到 Task Agent 的适配
@@ -294,9 +298,36 @@ CHUNK_OVERLAP=100
 CHECKPOINTER_BACKEND=sqlite
 CHECKPOINT_PATH=data/multi_agent.sqlite3
 
+# PostgreSQL 共享持久化（可选）
+# CHECKPOINTER_BACKEND=postgres
+# DATABASE_URL=postgresql://oncall_agent:<password>@localhost:5432/oncall_agent
+# POSTGRES_POOL_MIN_SIZE=1
+# POSTGRES_POOL_MAX_SIZE=10
+
 # 非运维业务 MCP 示例
 MCP_TICKET_URL=http://localhost:8005/mcp
 ```
+
+### PostgreSQL 共享持久化
+
+PostgreSQL 是可选后端，不影响默认 SQLite 启动。首次使用前设置 `.env` 中的
+`POSTGRES_PASSWORD`、`DATABASE_URL` 和 `CHECKPOINTER_BACKEND=postgres`，然后执行：
+
+```bash
+make postgres-up       # 启动独立 PostgreSQL 容器
+make db-upgrade        # 初始化业务表和 LangGraph Checkpoint 表
+make postgres-status
+```
+
+数据库不可达或 Schema 尚未初始化时，应用会明确启动失败，不会静默退回 SQLite。历史公开
+run、event 和 Trace 可在停止新写入并备份 SQLite 后迁移：
+
+```bash
+make db-migrate-sqlite SQLITE_PATH=data/multi_agent.sqlite3
+```
+
+迁移命令只读 SQLite 源文件并幂等 upsert PostgreSQL，不删除原文件，也不复制 LangGraph
+内部 Checkpoint 表。切换前应等待正在执行的 run 进入终态。
 
 ## 旧 AIOps 兼容入口
 
@@ -333,6 +364,9 @@ make sync              # 同步依赖
 # Docker 管理
 make up                # 启动 Docker 容器
 make down              # 停止 Docker 容器
+make postgres-up       # 启动可选 PostgreSQL
+make postgres-down     # 停止可选 PostgreSQL
+make db-upgrade        # 初始化/升级 PostgreSQL Schema
 
 # 代码质量
 make format            # 格式化代码

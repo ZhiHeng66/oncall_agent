@@ -138,3 +138,6 @@ Desktop.ini
 
 # Project-specific assistant/editor state
 .codebuddy/
+
+# Personal resume and job-application materials
+xzh_docs/resume/

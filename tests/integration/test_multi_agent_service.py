@@ -122,6 +122,29 @@ def make_service(runner) -> MultiAgentService:
     )
 
 
+class FailingStore:
+    async def save(self, request_message, response, events, metrics) -> None:
+        raise RuntimeError("database unavailable")
+
+    async def setup(self) -> None:
+        return None
+
+    async def get_run(self, run_id):
+        return None
+
+    async def get_trace(self, run_id):
+        return None
+
+    async def get_thread(self, thread_id):
+        raise NotImplementedError
+
+    async def delete_thread(self, thread_id):
+        return []
+
+    async def metrics(self):
+        raise NotImplementedError
+
+
 async def test_json_run_standardizes_sources_and_keeps_in_memory_lookup() -> None:
     runner = FakeRunner()
     service = make_service(runner)
@@ -184,6 +207,27 @@ async def test_stream_exception_emits_one_clean_failed_terminal() -> None:
 
     assert [event.type for event in events] == ["run_started", "run_failed"]
     assert "private-stream-token" not in events[-1].data["error"]
+
+
+async def test_stream_persistence_failure_still_emits_one_failed_terminal() -> None:
+    settings = Settings(_env_file=None, dashscope_api_key="")
+    service = MultiAgentService(
+        runner=FakeRunner(),
+        events=AgentEventService(settings),
+        settings=settings,
+        store=FailingStore(),
+    )
+
+    events = [
+        event
+        async for event in service.stream(
+            AgentRunRequest(user_id="user", thread_id="thread", message="question")
+        )
+    ]
+
+    assert events[-1].type == "run_failed"
+    assert sum(event.type in {"run_completed", "run_failed"} for event in events) == 1
+    assert events[-1].data["error"] == "database unavailable"
 
 
 async def test_closing_client_stream_cancels_underlying_runner() -> None:

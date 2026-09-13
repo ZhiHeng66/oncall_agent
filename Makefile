@@ -10,6 +10,7 @@ HEALTH_CHECK_API = $(SERVER_URL)/health
 DOCS_DIR = business-docs
 MILVUS_CONTAINER = milvus-standalone
 PYTHON ?= .venv/bin/python
+POSTGRES_COMPOSE = postgres-database.yml
 
 # 颜色输出
 GREEN = \033[0;32m
@@ -23,7 +24,8 @@ NC = \033[0m
         security pre-commit-install pre-commit check-all coverage eval docs shell \
         ipython watch add add-dev remove list-docs test-upload sync logs \
         start-cls stop-cls start-monitor stop-monitor start-ticket stop-ticket \
-        start-api stop-api status-mcp
+        start-api stop-api status-mcp postgres-up postgres-down postgres-status db-upgrade \
+        db-migrate-sqlite
 
 # ============================================================
 # 默认目标：显示帮助信息
@@ -189,6 +191,27 @@ status:
 		echo "$(YELLOW)⚠️  没有找到 Milvus 相关容器$(NC)"; \
 		echo "$(YELLOW)提示: 请先创建 Milvus 容器$(NC)"; \
 	fi
+
+# ============================================================
+# PostgreSQL shared persistence
+# ============================================================
+
+postgres-up:
+	@docker compose -f $(POSTGRES_COMPOSE) up -d
+	@echo "$(GREEN)PostgreSQL container started.$(NC)"
+
+postgres-down:
+	@docker compose -f $(POSTGRES_COMPOSE) down
+
+postgres-status:
+	@docker compose -f $(POSTGRES_COMPOSE) ps
+
+db-upgrade:
+	@$(PYTHON) -m app.cli.database upgrade
+
+db-migrate-sqlite:
+	@test -n "$(SQLITE_PATH)" || (echo "$(RED)SQLITE_PATH is required.$(NC)" && exit 1)
+	@$(PYTHON) -m app.cli.migrate_sqlite --sqlite-path "$(SQLITE_PATH)"
 
 # ============================================================
 # MCP 服务管理

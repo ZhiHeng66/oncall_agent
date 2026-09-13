@@ -13,7 +13,7 @@ from loguru import logger
 from app.agent.contracts import MultiAgentRunResult
 from app.agent.graph import multi_agent_graph
 from app.agent.mcp_client import sanitize_error_message
-from app.agent.runtime.checkpointer import CheckpointerFactory, checkpointer_factory
+from app.agent.runtime.checkpointer import CheckpointerFactory
 from app.agent.specialists.data.utils import sanitize_tool_output
 from app.config import Settings, config
 from app.models.agent import (
@@ -31,7 +31,8 @@ from app.models.agent import (
     PublicAgentName,
 )
 from app.services.event_service import AgentEventService, agent_event_service
-from app.services.run_store import MemoryRunStore, RunStore, SqliteRunStore
+from app.services.persistence import PersistenceFactory
+from app.services.run_store import MemoryRunStore, RunStore
 
 PUBLIC_METADATA_KEYS = {
     "_file_name",
@@ -77,13 +78,14 @@ class MultiAgentService:
         events: AgentEventService = agent_event_service,
         settings: Settings = config,
         store: RunStore | None = None,
-        checkpointers: CheckpointerFactory = checkpointer_factory,
+        checkpointers: CheckpointerFactory | None = None,
+        persistence: PersistenceFactory | None = None,
     ) -> None:
         self._runner = runner
         self._events = events
         self._settings = settings
         self._store = store or MemoryRunStore()
-        self._checkpointers = checkpointers
+        self._persistence = persistence or PersistenceFactory(settings, checkpointers)
         self._resources: AsyncExitStack | None = None
 
     async def startup(self) -> None:
@@ -93,15 +95,12 @@ class MultiAgentService:
             return
         self._resources = AsyncExitStack()
         await self._resources.__aenter__()
-        checkpointer = await self._resources.enter_async_context(self._checkpointers.open())
-        self._runner.set_checkpointer(checkpointer)
-        if self._settings.checkpointer_backend == "sqlite":
-            self._store = SqliteRunStore(self._settings.checkpoint_path)
-        await self._store.setup()
+        persistence = await self._resources.enter_async_context(self._persistence.open())
+        self._runner.set_checkpointer(persistence.checkpointer)
+        self._store = persistence.run_store
         logger.info(
-            "Agent persistence initialized backend={} path={}",
+            "Agent persistence initialized backend={}",
             self._settings.checkpointer_backend,
-            self._settings.checkpoint_path,
         )
 
     async def shutdown(self) -> None:
@@ -217,7 +216,7 @@ class MultiAgentService:
                 errors=[detail],
                 termination_reason="stream_failed",
             )
-            await self._record(
+            await self._record_failure_if_possible(
                 request,
                 response,
                 persisted_events,
@@ -241,13 +240,32 @@ class MultiAgentService:
                 errors=["Agent 事件流未返回终态。"],
                 termination_reason="missing_terminal",
             )
-            await self._record(
+            await self._record_failure_if_possible(
                 request,
                 response,
                 persisted_events,
                 self._metrics_from_events(response, persisted_events, started),
             )
             yield terminal_event
+
+    async def _record_failure_if_possible(
+        self,
+        request: AgentRunRequest,
+        response: AgentRunResponse,
+        events: list[AgentEventEnvelope],
+        metrics: AgentRunMetrics,
+    ) -> None:
+        """Keep an SSE failure terminal observable when its persistence also fails."""
+
+        try:
+            await self._record(request, response, events, metrics)
+        except Exception as exc:
+            logger.error(
+                "Agent failure trace persistence failed run_id={} thread_id={} error={}",
+                response.run_id,
+                response.thread_id,
+                sanitize_error_message(str(exc)),
+            )
 
     async def get_run(self, run_id: str) -> AgentRunResponse | None:
         return await self._store.get_run(run_id)
