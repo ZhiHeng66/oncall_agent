@@ -3,12 +3,14 @@
 import asyncio
 import time
 from collections.abc import Callable
+from datetime import UTC, datetime
 from typing import Any, Protocol
 
 from langchain_core.language_models.chat_models import BaseChatModel
 
 from app.agent.contracts import AgentResult, AgentStatus, AgentTask, Evidence
 from app.agent.mcp_client import sanitize_error_message
+from app.agent.memory.policy import dynamic_evidence_valid_until, query_scope_fingerprint
 from app.agent.specialists.data.prompt import DATA_TOOL_PLAN_PROMPT
 from app.agent.specialists.data.schemas import DataToolPlan
 from app.agent.specialists.data.utils import sanitize_tool_output
@@ -55,10 +57,12 @@ class DataAgent:
         registry: ToolRegistry = tool_registry,
         planner: DataToolPlanner | None = None,
         settings: Settings = config,
+        clock: Callable[[], datetime] | None = None,
     ) -> None:
         self._registry = registry
         self._planner = planner
         self._settings = settings
+        self._clock = clock or (lambda: datetime.now(UTC))
 
     async def run(
         self,
@@ -115,7 +119,14 @@ class DataAgent:
                     duration_ms=(time.perf_counter() - started) * 1000,
                 )
                 continue
-            evidence.append(self._to_evidence(registered_tool, output))
+            evidence.append(
+                self._to_evidence(
+                    registered_tool,
+                    output,
+                    arguments=call.arguments,
+                    observed_at=self._clock(),
+                )
+            )
             self._emit_tool_event(
                 event_sink,
                 "tool_completed",
@@ -140,7 +151,14 @@ class DataAgent:
             errors=errors,
         )
 
-    def _to_evidence(self, registered: RegisteredTool, output: object) -> Evidence:
+    def _to_evidence(
+        self,
+        registered: RegisteredTool,
+        output: object,
+        *,
+        arguments: dict[str, Any],
+        observed_at: datetime,
+    ) -> Evidence:
         spec = registered.spec
         return Evidence(
             source_type="mcp" if spec.source == "mcp" else "tool",
@@ -152,6 +170,16 @@ class DataAgent:
                 "server_name": spec.server_name,
                 "category": spec.category,
             },
+            observed_at=observed_at,
+            temporal_scope="snapshot",
+            valid_until=dynamic_evidence_valid_until(
+                observed_at,
+                tool_name=spec.name,
+                server_name=spec.server_name,
+                category=spec.category,
+                settings=self._settings,
+            ),
+            query_scope=query_scope_fingerprint(arguments),
         )
 
     @staticmethod

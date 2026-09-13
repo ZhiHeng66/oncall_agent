@@ -13,12 +13,14 @@ from app.agent.runtime.checkpointer import (
 )
 from app.config import Settings, config
 from app.services.run_store import MemoryRunStore, PostgresRunStore, RunStore, SqliteRunStore
+from app.services.working_memory_store import PostgresWorkingMemoryStore, WorkingMemoryStore
 
 
 @dataclass(frozen=True)
 class PersistenceResources:
     checkpointer: BaseCheckpointSaver
     run_store: RunStore
+    working_memory_store: WorkingMemoryStore | None
 
 
 class PersistenceFactory:
@@ -38,13 +40,21 @@ class PersistenceFactory:
         if backend == "memory":
             memory_store = MemoryRunStore()
             await memory_store.setup()
-            yield PersistenceResources(self._checkpointers.create_memory(), memory_store)
+            yield PersistenceResources(
+                checkpointer=self._checkpointers.create_memory(),
+                run_store=memory_store,
+                working_memory_store=None,
+            )
             return
         if backend == "sqlite":
             async with self._checkpointers.open("sqlite") as checkpointer:
                 sqlite_store = SqliteRunStore(self._settings.checkpoint_path)
                 await sqlite_store.setup()
-                yield PersistenceResources(checkpointer, sqlite_store)
+                yield PersistenceResources(
+                    checkpointer=checkpointer,
+                    run_store=sqlite_store,
+                    working_memory_store=None,
+                )
             return
 
         pool = create_postgres_pool(self._settings)
@@ -53,7 +63,16 @@ class PersistenceFactory:
             await self._verify_checkpoint_schema(pool)
             postgres_store = PostgresRunStore(pool)
             await postgres_store.setup()
-            yield PersistenceResources(self._checkpointers.create_postgres(pool), postgres_store)
+            working_memory_store: WorkingMemoryStore | None = None
+            if self._settings.working_memory_enabled:
+                postgres_memory_store = PostgresWorkingMemoryStore(pool)
+                await postgres_memory_store.setup()
+                working_memory_store = postgres_memory_store
+            yield PersistenceResources(
+                checkpointer=self._checkpointers.create_postgres(pool),
+                run_store=postgres_store,
+                working_memory_store=working_memory_store,
+            )
         finally:
             await pool.close()
 

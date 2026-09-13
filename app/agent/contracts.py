@@ -1,8 +1,9 @@
 """Typed contracts exchanged between agents and workflow boundaries."""
 
+from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 AgentStatus = Literal["success", "partial", "failed"]
 EvidenceSourceType = Literal["knowledge", "mcp", "tool"]
@@ -10,6 +11,7 @@ AgentTarget = Literal["knowledge", "data", "task"]
 RetryTarget = Literal["none", "knowledge", "data", "task", "supervisor"]
 RouteMode = Literal["direct", "single", "parallel", "complex"]
 RunStatus = Literal["running", "completed", "partial", "failed"]
+TemporalScope = Literal["static", "snapshot", "time_window"]
 
 
 class AgentTask(BaseModel):
@@ -27,6 +29,29 @@ class Evidence(BaseModel):
     source_id: str | None = None
     content: str
     metadata: dict[str, Any] = Field(default_factory=dict)
+    observed_at: datetime | None = None
+    temporal_scope: TemporalScope = "static"
+    valid_until: datetime | None = None
+    query_scope: str | None = Field(default=None, max_length=128)
+
+    @field_validator("observed_at", "valid_until")
+    @classmethod
+    def require_aware_timestamps(cls, value: datetime | None) -> datetime | None:
+        if value is not None and (value.tzinfo is None or value.utcoffset() is None):
+            raise ValueError("evidence timestamps must include a timezone")
+        return value
+
+    @model_validator(mode="after")
+    def validate_temporal_fields(self) -> "Evidence":
+        if self.temporal_scope != "static" and self.observed_at is None:
+            raise ValueError("dynamic evidence requires observed_at")
+        if (
+            self.observed_at is not None
+            and self.valid_until is not None
+            and self.valid_until <= self.observed_at
+        ):
+            raise ValueError("valid_until must be later than observed_at")
+        return self
 
 
 class AgentResult(BaseModel):

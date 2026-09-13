@@ -6,6 +6,7 @@ from pydantic import ValidationError
 from app.cli.migrate_sqlite import migrate_sqlite_run_store
 from app.config import Settings
 from app.models.agent import AgentRunMetrics, AgentRunResponse
+from app.services.persistence import PersistenceFactory
 from app.services.run_store import MemoryRunStore, SqliteRunStore
 
 
@@ -26,6 +27,25 @@ def test_postgres_pool_maximum_must_cover_minimum() -> None:
             dashscope_api_key="",
             postgres_pool_min_size=3,
             postgres_pool_max_size=2,
+        )
+
+
+def test_working_memory_budgets_must_be_consistent() -> None:
+    with pytest.raises(ValidationError, match="SUMMARY_MAX_CHARS"):
+        Settings(
+            _env_file=None,
+            dashscope_api_key="",
+            working_memory_context_max_chars=1000,
+            working_memory_summary_max_chars=2000,
+        )
+
+    with pytest.raises(ValidationError, match="COMPRESSION_THRESHOLD"):
+        Settings(
+            _env_file=None,
+            dashscope_api_key="",
+            working_memory_context_max_chars=1000,
+            working_memory_summary_max_chars=1000,
+            working_memory_compression_threshold=2000,
         )
 
 
@@ -50,3 +70,17 @@ async def test_sqlite_run_store_migration_is_validated_and_idempotent(tmp_path: 
     assert first.events == second.events == 0
     assert await target.get_run("migration-run") == response
     assert (await target.metrics()).total_runs == 1
+
+
+async def test_non_postgres_backends_explicitly_disable_working_memory(tmp_path: Path) -> None:
+    for settings in (
+        Settings(_env_file=None, dashscope_api_key="", checkpointer_backend="memory"),
+        Settings(
+            _env_file=None,
+            dashscope_api_key="",
+            checkpointer_backend="sqlite",
+            checkpoint_path=str(tmp_path / "runtime.sqlite3"),
+        ),
+    ):
+        async with PersistenceFactory(settings).open() as persistence:
+            assert persistence.working_memory_store is None

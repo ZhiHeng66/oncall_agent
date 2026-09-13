@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from typing import Any
 
 from langchain_core.tools import tool
@@ -88,6 +89,32 @@ async def test_data_agent_sanitizes_successful_tool_evidence() -> None:
     assert result.evidence[0].source_type == "tool"
     assert "must-not-leak" not in result.evidence[0].content
     assert "[REDACTED]" in result.evidence[0].content
+
+
+async def test_data_agent_records_server_owned_temporal_provenance() -> None:
+    observed_at = datetime(2026, 9, 13, 10, 0, tzinfo=UTC)
+    settings = Settings(
+        _env_file=None,
+        dashscope_api_key="",
+        working_memory_default_dynamic_ttl_seconds=120,
+    )
+    planner = FakePlanner([DataToolCall(tool_name="successful_query", arguments={"query": "x"})])
+    agent = DataAgent(
+        registry=make_registry(),
+        planner=planner,
+        settings=settings,
+        clock=lambda: observed_at,
+    )
+
+    result = await agent.run(make_task())
+
+    evidence = result.evidence[0]
+    assert evidence.temporal_scope == "snapshot"
+    assert evidence.observed_at == observed_at
+    assert evidence.valid_until == datetime(2026, 9, 13, 10, 2, tzinfo=UTC)
+    assert evidence.query_scope is not None
+    assert evidence.query_scope.startswith("sha256:")
+    assert "x" not in evidence.query_scope
 
 
 async def test_data_agent_emits_safe_tool_lifecycle_events() -> None:

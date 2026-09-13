@@ -1,6 +1,7 @@
 import asyncio
 import os
 from collections.abc import Iterator
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from uuid import uuid4
 
@@ -9,6 +10,8 @@ from psycopg.errors import UniqueViolation
 
 from app.agent.contracts import RouteDecision
 from app.agent.graph import MultiAgentGraph
+from app.agent.memory.contracts import WorkingMemoryContext
+from app.agent.runtime.checkpointer import create_postgres_pool
 from app.cli.database import upgrade_application_schema, upgrade_checkpoint_schema
 from app.cli.migrate_sqlite import migrate_sqlite_run_store
 from app.config import Settings
@@ -137,6 +140,69 @@ async def test_postgres_run_store_concurrent_writes_are_complete(postgres_settin
         assert len(thread.run_ids) == 12
         assert all(trace is not None and len(trace.events) == 1 for trace in traces)
         await persistence.run_store.delete_thread(thread_id)
+
+
+async def test_postgres_working_memory_persists_and_uses_compare_and_swap(
+    postgres_settings,
+) -> None:
+    thread_id = f"memory-thread-{uuid4()}"
+    now = datetime.now(UTC)
+    first = WorkingMemoryContext(
+        thread_id=thread_id,
+        owner_user_id="user",
+        version=1,
+        current_goal="diagnose login failures",
+        created_at=now,
+        updated_at=now,
+    )
+    async with PersistenceFactory(postgres_settings).open() as persistence:
+        store = persistence.working_memory_store
+        assert store is not None
+        assert await store.create(first) is True
+        assert await store.create(first) is False
+
+    async with PersistenceFactory(postgres_settings).open() as persistence:
+        store = persistence.working_memory_store
+        assert store is not None
+        assert await store.load(thread_id) == first
+        second = first.model_copy(
+            update={
+                "version": 2,
+                "current_goal": "continue diagnosing login failures",
+                "updated_at": now + timedelta(seconds=1),
+            }
+        )
+        results = await asyncio.gather(
+            store.compare_and_swap(second, expected_version=1),
+            store.compare_and_swap(second, expected_version=1),
+        )
+        assert sum(results) == 1
+        assert await store.load(thread_id) == second
+        await store.delete_thread(thread_id)
+        assert await store.load(thread_id) is None
+
+
+async def test_postgres_working_memory_schema_has_required_constraints(
+    postgres_settings,
+) -> None:
+    pool = create_postgres_pool(postgres_settings)
+    await pool.open(wait=True)
+    try:
+        async with pool.connection() as connection:
+            async with connection.cursor() as cursor:
+                await cursor.execute("""SELECT conname FROM pg_constraint
+                    WHERE conrelid = 'agent_working_memories'::regclass""")
+                constraints = {row["conname"] for row in await cursor.fetchall()}
+    finally:
+        await pool.close()
+
+    assert {
+        "agent_working_memories_pkey",
+        "ck_working_memory_schema_version",
+        "ck_working_memory_version",
+        "ck_working_memory_context_object",
+        "ck_working_memory_timestamp_order",
+    } <= constraints
 
 
 async def test_postgres_run_store_upsert_replaces_events(postgres_settings) -> None:

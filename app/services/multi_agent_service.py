@@ -33,6 +33,7 @@ from app.models.agent import (
 from app.services.event_service import AgentEventService, agent_event_service
 from app.services.persistence import PersistenceFactory
 from app.services.run_store import MemoryRunStore, RunStore
+from app.services.working_memory_store import WorkingMemoryStore
 
 PUBLIC_METADATA_KEYS = {
     "_file_name",
@@ -85,6 +86,7 @@ class MultiAgentService:
         self._events = events
         self._settings = settings
         self._store = store or MemoryRunStore()
+        self._working_memory_store: WorkingMemoryStore | None = None
         self._persistence = persistence or PersistenceFactory(settings, checkpointers)
         self._resources: AsyncExitStack | None = None
 
@@ -98,9 +100,11 @@ class MultiAgentService:
         persistence = await self._resources.enter_async_context(self._persistence.open())
         self._runner.set_checkpointer(persistence.checkpointer)
         self._store = persistence.run_store
+        self._working_memory_store = persistence.working_memory_store
         logger.info(
-            "Agent persistence initialized backend={}",
+            "Agent persistence initialized backend={} working_memory_enabled={}",
             self._settings.checkpointer_backend,
+            self._working_memory_store is not None,
         )
 
     async def shutdown(self) -> None:

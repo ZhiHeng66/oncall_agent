@@ -86,6 +86,24 @@ class Settings(BaseSettings):
     api_answer_max_chars: int = 20000
     graph_recursion_limit: int = 50
 
+    # PostgreSQL 跨轮工作记忆
+    working_memory_enabled: bool = True
+    working_memory_recent_turns: int = Field(default=2, ge=1, le=10)
+    working_memory_recent_message_max_chars: int = Field(default=2000, ge=100, le=10000)
+    working_memory_context_max_chars: int = Field(default=8000, ge=1000, le=50000)
+    working_memory_summary_max_chars: int = Field(default=4000, ge=500, le=4000)
+    working_memory_max_items: int = Field(default=100, ge=1, le=100)
+    working_memory_max_open_questions: int = Field(default=32, ge=1, le=32)
+    working_memory_max_next_steps: int = Field(default=32, ge=1, le=32)
+    working_memory_max_evidence_refs: int = Field(default=16, ge=1, le=16)
+    working_memory_compression_threshold: int = Field(default=6000, ge=500, le=50000)
+    working_memory_update_max_retries: int = Field(default=1, ge=0, le=5)
+    working_memory_compression_timeout_seconds: float = Field(default=30.0, gt=0)
+    working_memory_alert_ttl_seconds: float = Field(default=60.0, gt=0)
+    working_memory_metric_ttl_seconds: float = Field(default=300.0, gt=0)
+    working_memory_ticket_ttl_seconds: float = Field(default=60.0, gt=0)
+    working_memory_default_dynamic_ttl_seconds: float = Field(default=300.0, gt=0)
+
     # Prometheus
     prometheus_base_url: str = "http://127.0.0.1:9090"
     prometheus_request_timeout: float = 10.0
@@ -96,6 +114,15 @@ class Settings(BaseSettings):
             raise ValueError("DATABASE_URL is required for the postgres persistence backend")
         if self.postgres_pool_max_size < self.postgres_pool_min_size:
             raise ValueError("POSTGRES_POOL_MAX_SIZE must be at least POSTGRES_POOL_MIN_SIZE")
+        if self.working_memory_summary_max_chars > self.working_memory_context_max_chars:
+            raise ValueError(
+                "WORKING_MEMORY_SUMMARY_MAX_CHARS cannot exceed " "WORKING_MEMORY_CONTEXT_MAX_CHARS"
+            )
+        if self.working_memory_compression_threshold > self.working_memory_context_max_chars:
+            raise ValueError(
+                "WORKING_MEMORY_COMPRESSION_THRESHOLD cannot exceed "
+                "WORKING_MEMORY_CONTEXT_MAX_CHARS"
+            )
         return self
 
     @property
