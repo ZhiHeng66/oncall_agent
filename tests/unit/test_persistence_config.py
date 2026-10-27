@@ -1,4 +1,5 @@
 from pathlib import Path
+from uuid import UUID
 
 import pytest
 from pydantic import ValidationError
@@ -8,6 +9,13 @@ from app.config import Settings
 from app.models.agent import AgentRunMetrics, AgentRunResponse
 from app.services.persistence import PersistenceFactory
 from app.services.run_store import MemoryRunStore, SqliteRunStore
+
+
+def test_postgres_is_the_default_persistence_backend() -> None:
+    settings = Settings(_env_file=None, dashscope_api_key="")
+
+    assert settings.checkpointer_backend == "postgres"
+    assert settings.database_url.startswith("postgresql://")
 
 
 def test_postgres_backend_requires_database_url() -> None:
@@ -27,6 +35,16 @@ def test_postgres_pool_maximum_must_cover_minimum() -> None:
             dashscope_api_key="",
             postgres_pool_min_size=3,
             postgres_pool_max_size=2,
+        )
+
+
+def test_authentication_requires_a_non_placeholder_jwt_secret() -> None:
+    with pytest.raises(ValidationError, match="JWT_SECRET_KEY"):
+        Settings(
+            _env_file=None,
+            dashscope_api_key="",
+            auth_enabled=True,
+            jwt_secret_key="",
         )
 
 
@@ -60,7 +78,8 @@ async def test_sqlite_run_store_migration_is_validated_and_idempotent(tmp_path: 
         termination_reason="completed",
     )
     metrics = AgentRunMetrics(duration_ms=12.0, dispatch_count=1)
-    await source.save("migrated question", response, [], metrics)
+    owner = UUID("00000000-0000-0000-0000-000000000001")
+    await source.save(owner, "migrated question", response, [], metrics)
     target = MemoryRunStore()
 
     first = await migrate_sqlite_run_store(tmp_path / "source.sqlite3", target)
@@ -68,8 +87,8 @@ async def test_sqlite_run_store_migration_is_validated_and_idempotent(tmp_path: 
 
     assert first.runs == second.runs == 1
     assert first.events == second.events == 0
-    assert await target.get_run("migration-run") == response
-    assert (await target.metrics()).total_runs == 1
+    assert await target.get_run(owner, "migration-run") == response
+    assert (await target.metrics(owner)).total_runs == 1
 
 
 async def test_non_postgres_backends_explicitly_disable_working_memory(tmp_path: Path) -> None:

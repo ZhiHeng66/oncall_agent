@@ -171,11 +171,13 @@ class TaskAgent:
             "termination_reason": reason,
         }
 
-    async def run(self, task: AgentTask, thread_id: str | None = None) -> AgentResult:
+    async def run(
+        self, task: AgentTask, thread_id: str | None = None, run_id: str | None = None
+    ) -> AgentResult:
         try:
             result = await self.graph.ainvoke(
                 self._initial_state(task),
-                config=self._config(task, thread_id),
+                config=self._config(task, thread_id, run_id),
             )
         except Exception as exc:
             detail = sanitize_error_message(str(exc))
@@ -192,11 +194,12 @@ class TaskAgent:
         self,
         task: AgentTask,
         thread_id: str | None = None,
+        run_id: str | None = None,
     ) -> AsyncGenerator[dict[str, Any], None]:
         try:
             async for mode, event in self.graph.astream(
                 self._initial_state(task),
-                config=self._config(task, thread_id),
+                config=self._config(task, thread_id, run_id),
                 stream_mode=["custom", "updates"],
             ):
                 if mode == "custom":
@@ -204,7 +207,7 @@ class TaskAgent:
                 elif NODE_PLANNER in event and event[NODE_PLANNER].get("plan"):
                     yield {"type": "plan_created", "plan": event[NODE_PLANNER]["plan"]}
 
-            snapshot = self.graph.get_state(self._config(task, thread_id))
+            snapshot = self.graph.get_state(self._config(task, thread_id, run_id))
             result = self._to_result(snapshot.values)
             terminal_type = "run_completed" if result.status != "failed" else "run_failed"
             yield {"type": terminal_type, "result": result.model_dump(mode="json")}
@@ -235,8 +238,10 @@ class TaskAgent:
             "workflow_errors": [],
         }
 
-    def _config(self, task: AgentTask, thread_id: str | None) -> dict[str, Any]:
-        internal_thread = f"{thread_id or task.task_id}:{task.task_id}"
+    def _config(
+        self, task: AgentTask, thread_id: str | None, run_id: str | None = None
+    ) -> dict[str, Any]:
+        internal_thread = f"{thread_id or task.task_id}:{run_id or task.task_id}:{task.task_id}"
         return {
             "configurable": {"thread_id": internal_thread},
             "recursion_limit": self._limits.graph_recursion_limit,

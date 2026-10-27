@@ -1,0 +1,196 @@
+{
+  "attempts": [
+    {
+      "attempt": "real-run",
+      "stop_reason": "stopped_after_noncompleted_or_protocol_failure",
+      "requests": 5,
+      "statuses": {
+        "completed": 4,
+        "partial": 1
+      },
+      "protocol_pass": 5,
+      "account": {
+        "role": "user",
+        "is_active": false
+      },
+      "persisted_runs": 5,
+      "working_memory_count": 5,
+      "resource_observation": {
+        "method": "macOS ps sampled every ~2s; CPU is ps average, not instant utilization",
+        "listener_pids": [
+          "63102"
+        ],
+        "samples": 23,
+        "peak_rss_kib": 198640,
+        "max_observed_ps_cpu_percent": 27.1
+      }
+    },
+    {
+      "attempt": "real-run-02",
+      "stop_reason": "stopped_after_failure_or_rate_limit_threshold",
+      "requests": 2,
+      "statuses": {
+        "completed": 1,
+        "failed": 1
+      },
+      "protocol_pass": 2,
+      "account": {
+        "role": "user",
+        "is_active": false
+      },
+      "persisted_runs": 2,
+      "working_memory_count": 2,
+      "resource_observation": {
+        "method": "macOS ps sampled every ~2s; CPU is ps average, not instant utilization",
+        "listener_pids": [
+          "63102"
+        ],
+        "samples": 6,
+        "peak_rss_kib": 179488,
+        "max_observed_ps_cpu_percent": 4.4
+      }
+    }
+  ],
+  "content_checks": [
+    {
+      "attempt": "real-run",
+      "request_id": "baseline-knowledge-1-0",
+      "scenario": "knowledge",
+      "sample_id": 0,
+      "business_status": "completed",
+      "termination_reason": "fast_path",
+      "source_types": [
+        "knowledge"
+      ],
+      "has_citation": true,
+      "has_public_error": false,
+      "provider_arrearage": false,
+      "no_authorized_tool_error": false,
+      "dispatch_count": 1,
+      "tool_call_count": 0,
+      "expected_constraint_present": true
+    },
+    {
+      "attempt": "real-run",
+      "request_id": "baseline-knowledge-2-1",
+      "scenario": "knowledge",
+      "sample_id": 1,
+      "business_status": "completed",
+      "termination_reason": "fast_path",
+      "source_types": [
+        "knowledge"
+      ],
+      "has_citation": true,
+      "has_public_error": false,
+      "provider_arrearage": false,
+      "no_authorized_tool_error": false,
+      "dispatch_count": 1,
+      "tool_call_count": 0,
+      "expected_sla_markers_present": true
+    },
+    {
+      "attempt": "real-run",
+      "request_id": "baseline-knowledge-3-2",
+      "scenario": "knowledge",
+      "sample_id": 2,
+      "business_status": "completed",
+      "termination_reason": "review_passed",
+      "source_types": [
+        "knowledge"
+      ],
+      "has_citation": true,
+      "has_public_error": false,
+      "provider_arrearage": false,
+      "no_authorized_tool_error": false,
+      "dispatch_count": 1,
+      "tool_call_count": 0,
+      "expected_faq_markers_present": true
+    },
+    {
+      "attempt": "real-run",
+      "request_id": "baseline-data-1-0",
+      "scenario": "data",
+      "sample_id": 0,
+      "business_status": "completed",
+      "termination_reason": "fast_path",
+      "source_types": [
+        "mcp"
+      ],
+      "has_citation": false,
+      "has_public_error": false,
+      "provider_arrearage": false,
+      "no_authorized_tool_error": false,
+      "dispatch_count": 1,
+      "tool_call_count": 1,
+      "expected_ticket_and_state_present": true,
+      "other_ticket_id_present": false
+    },
+    {
+      "attempt": "real-run",
+      "request_id": "baseline-data-2-1",
+      "scenario": "data",
+      "sample_id": 1,
+      "business_status": "partial",
+      "termination_reason": "review_passed",
+      "source_types": [
+        "mcp"
+      ],
+      "has_citation": false,
+      "has_public_error": true,
+      "provider_arrearage": false,
+      "no_authorized_tool_error": true,
+      "dispatch_count": 2,
+      "tool_call_count": 1,
+      "expected_ticket_and_state_present": true,
+      "other_ticket_id_present": false
+    },
+    {
+      "attempt": "real-run-02",
+      "request_id": "baseline-knowledge-1-0",
+      "scenario": "knowledge",
+      "sample_id": 0,
+      "business_status": "completed",
+      "termination_reason": "fast_path",
+      "source_types": [
+        "knowledge"
+      ],
+      "has_citation": true,
+      "has_public_error": false,
+      "provider_arrearage": false,
+      "no_authorized_tool_error": false,
+      "dispatch_count": 1,
+      "tool_call_count": 0,
+      "expected_constraint_present": true
+    },
+    {
+      "attempt": "real-run-02",
+      "request_id": "baseline-knowledge-2-1",
+      "scenario": "knowledge",
+      "sample_id": 1,
+      "business_status": "failed",
+      "termination_reason": "all_specialists_failed",
+      "source_types": [],
+      "has_citation": false,
+      "has_public_error": true,
+      "provider_arrearage": true,
+      "no_authorized_tool_error": false,
+      "dispatch_count": 1,
+      "tool_call_count": 0,
+      "expected_sla_markers_present": false
+    }
+  ],
+  "submitted_requests": 7,
+  "counts": {
+    "completed": 5,
+    "partial": 1,
+    "failed": 1
+  },
+  "blocked_by": "provider_arrearage_at_concurrency_1",
+  "levels_not_executed": [
+    10,
+    30,
+    50,
+    100
+  ],
+  "semantic_check_limit": "keyword/evidence checks only, not full answer grading"
+}

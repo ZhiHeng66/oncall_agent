@@ -16,7 +16,8 @@ REVIEW_PROMPT = ChatPromptTemplate.from_messages(
             """原始请求：{user_query}
 候选答案：{candidate_answer}
 证据摘要：{evidence_summary}
-已记录错误：{errors}""",
+已记录错误：{errors}
+案件上下文（过期动态观察不可作为当前事实）：{memory_context}""",
         ),
     ]
 )

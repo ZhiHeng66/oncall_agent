@@ -12,11 +12,25 @@
     <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/es/highlight.min.js"></script>
 </head>
 <body>
-    <div class="app-layout">
+    <section class="login-screen" id="loginScreen">
+        <form class="login-card" id="loginForm">
+            <h1>企业知识服务平台</h1>
+            <p>请使用管理员创建的本地账号登录。</p>
+            <label>用户名<input id="loginUsername" name="username" autocomplete="username" required></label>
+            <label>密码<input id="loginPassword" name="password" type="password" autocomplete="current-password" required></label>
+            <p class="login-error" id="loginError" role="alert"></p>
+            <button type="submit">登录</button>
+        </form>
+    </section>
+    <div class="app-layout" id="appLayout" hidden>
         <!-- 左侧边栏 -->
         <aside class="sidebar">
             <div class="sidebar-header">
                 <h2 class="sidebar-title">企业知识服务平台</h2>
+                <div class="account-bar">
+                    <span id="currentUsername"></span>
+                    <button id="logoutBtn" type="button">退出</button>
+                </div>
             </div>
             
             <div class="sidebar-content">

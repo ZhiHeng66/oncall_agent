@@ -1,0 +1,375 @@
+{
+  "environment": {
+    "utc_started": "2026-10-07T13:43:56.850046+00:00",
+    "platform": "macOS-26.5.1-arm64-arm-64bit-Mach-O",
+    "python": "3.13.9",
+    "httpx": "0.28.1",
+    "base_url": "http://127.0.0.1:9900",
+    "commit": "c4968257aba423c5b206f67532e0ccf1f8057685",
+    "branch": "multi-agents",
+    "dirty_worktree": true,
+    "model_configuration": "not inspected: server-owned; no .env read",
+    "model_quota": "unknown",
+    "server_workers": "unknown",
+    "milvus_document_count": "unknown",
+    "billing": "not measured",
+    "startup_window_s": 3,
+    "timeout_s": 300,
+    "batch_pause_s": 30,
+    "max_requests": 579,
+    "max_duration_s": 7200,
+    "test_username": "loadtest_7fd40a500190",
+    "test_user_id": "cb8c63ea-c357-4967-a57a-20e81209e6a9",
+    "account_role": "user",
+    "account_creation": "local PostgreSQL + project Argon2",
+    "account_disabled_after_test": true,
+    "token_expires_in_s": 1800,
+    "resource_observation": {
+      "method": "macOS ps sampled every ~2s; CPU is ps average, not instant utilization",
+      "listener_pids": [
+        "63102"
+      ],
+      "samples": 23,
+      "peak_rss_kib": 198640,
+      "max_observed_ps_cpu_percent": 27.1
+    }
+  },
+  "stop_reason": "stopped_after_noncompleted_or_protocol_failure",
+  "batches": [
+    {
+      "batch_id": "baseline-knowledge-1",
+      "target": 1,
+      "peak": 1,
+      "summary": {
+        "requests": 1,
+        "statuses": {
+          "completed": 1
+        },
+        "error_categories": {
+          "none": 1
+        },
+        "http_200": 1,
+        "protocol_pass": 1,
+        "completion_rate": 1.0,
+        "completed_duration_samples": 1,
+        "completed_mean_ms": 7356.9,
+        "completed_p95_ms": 7356.9,
+        "first_content_mean_ms": 5690.09,
+        "actual_routes": {
+          "single:knowledge": 1
+        }
+      }
+    },
+    {
+      "batch_id": "baseline-knowledge-2",
+      "target": 1,
+      "peak": 1,
+      "summary": {
+        "requests": 1,
+        "statuses": {
+          "completed": 1
+        },
+        "error_categories": {
+          "none": 1
+        },
+        "http_200": 1,
+        "protocol_pass": 1,
+        "completion_rate": 1.0,
+        "completed_duration_samples": 1,
+        "completed_mean_ms": 6944.42,
+        "completed_p95_ms": 6944.42,
+        "first_content_mean_ms": 6010.09,
+        "actual_routes": {
+          "single:knowledge": 1
+        }
+      }
+    },
+    {
+      "batch_id": "baseline-knowledge-3",
+      "target": 1,
+      "peak": 1,
+      "summary": {
+        "requests": 1,
+        "statuses": {
+          "completed": 1
+        },
+        "error_categories": {
+          "none": 1
+        },
+        "http_200": 1,
+        "protocol_pass": 1,
+        "completion_rate": 1.0,
+        "completed_duration_samples": 1,
+        "completed_mean_ms": 10600.73,
+        "completed_p95_ms": 10600.73,
+        "first_content_mean_ms": 9911.24,
+        "actual_routes": {
+          "direct:/single:knowledge": 1
+        }
+      }
+    },
+    {
+      "batch_id": "baseline-data-1",
+      "target": 1,
+      "peak": 1,
+      "summary": {
+        "requests": 1,
+        "statuses": {
+          "completed": 1
+        },
+        "error_categories": {
+          "none": 1
+        },
+        "http_200": 1,
+        "protocol_pass": 1,
+        "completion_rate": 1.0,
+        "completed_duration_samples": 1,
+        "completed_mean_ms": 7515.21,
+        "completed_p95_ms": 7515.21,
+        "first_content_mean_ms": 6614.7,
+        "actual_routes": {
+          "single:data": 1
+        }
+      }
+    },
+    {
+      "batch_id": "baseline-data-2",
+      "target": 1,
+      "peak": 1,
+      "summary": {
+        "requests": 1,
+        "statuses": {
+          "partial": 1
+        },
+        "error_categories": {
+          "tool_or_mcp": 1
+        },
+        "http_200": 1,
+        "protocol_pass": 1,
+        "completion_rate": 0.0,
+        "completed_duration_samples": 0,
+        "completed_mean_ms": null,
+        "completed_p95_ms": null,
+        "first_content_mean_ms": 10133.88,
+        "actual_routes": {
+          "single:data/single:data": 1
+        }
+      }
+    }
+  ],
+  "checks": [
+    {
+      "check": "local_port",
+      "port": 9900,
+      "reachable": true
+    },
+    {
+      "check": "local_port",
+      "port": 5432,
+      "reachable": true
+    },
+    {
+      "check": "local_port",
+      "port": 19530,
+      "reachable": true
+    },
+    {
+      "check": "local_port",
+      "port": 8003,
+      "reachable": true
+    },
+    {
+      "check": "local_port",
+      "port": 8004,
+      "reachable": true
+    },
+    {
+      "check": "local_port",
+      "port": 8005,
+      "reachable": true
+    },
+    {
+      "check": "/health",
+      "http_status": 200
+    },
+    {
+      "check": "/api/auth/me",
+      "http_status": 200
+    },
+    {
+      "check": "/api/agent/threads",
+      "http_status": 200
+    },
+    {
+      "check": "persistence",
+      "request_id": "baseline-knowledge-1-0",
+      "run_ok": true,
+      "trace_ok": true
+    },
+    {
+      "check": "persistence",
+      "request_id": "baseline-knowledge-2-1",
+      "run_ok": true,
+      "trace_ok": true
+    },
+    {
+      "check": "persistence",
+      "request_id": "baseline-knowledge-3-2",
+      "run_ok": true,
+      "trace_ok": true
+    },
+    {
+      "check": "persistence",
+      "request_id": "baseline-data-1-0",
+      "run_ok": true,
+      "trace_ok": true
+    },
+    {
+      "check": "persistence",
+      "request_id": "baseline-data-2-1",
+      "run_ok": true,
+      "trace_ok": true
+    }
+  ],
+  "created_threads": [
+    "d7289208-4981-41e3-b037-68b8e065ab40",
+    "57fd1907-0b96-4124-8a0f-8c303a6b6180",
+    "0ec692bb-f40d-44da-a92d-fb83b61ec480",
+    "42967d5a-ec91-4450-9ab9-b27b2f10aa1c",
+    "400914eb-943c-4133-99e3-8523daf080f3"
+  ],
+  "rows": [
+    {
+      "batch_id": "baseline-knowledge-1",
+      "scenario": "knowledge",
+      "sample_id": 0,
+      "target_concurrency": 1,
+      "request_id": "baseline-knowledge-1-0",
+      "thread_id": "d7289208-4981-41e3-b037-68b8e065ab40",
+      "run_id": "dec4b43a-d662-4a62-bfa6-caba37673a4a",
+      "actual_routes": [
+        "single:knowledge"
+      ],
+      "http_status": 200,
+      "business_status": "completed",
+      "error_category": "none",
+      "first_event_ms": 19.56,
+      "first_content_ms": 5690.09,
+      "terminal_ms": 7356.9,
+      "elapsed_ms": 7357.56,
+      "terminal_count": 1,
+      "event_count": 19,
+      "protocol_ok": true,
+      "answer_nonempty": true,
+      "source_types": [
+        "knowledge"
+      ]
+    },
+    {
+      "batch_id": "baseline-knowledge-2",
+      "scenario": "knowledge",
+      "sample_id": 1,
+      "target_concurrency": 1,
+      "request_id": "baseline-knowledge-2-1",
+      "thread_id": "57fd1907-0b96-4124-8a0f-8c303a6b6180",
+      "run_id": "9f136fb6-b4f1-4028-a1ea-e11c28a1c588",
+      "actual_routes": [
+        "single:knowledge"
+      ],
+      "http_status": 200,
+      "business_status": "completed",
+      "error_category": "none",
+      "first_event_ms": 4.8,
+      "first_content_ms": 6010.09,
+      "terminal_ms": 6944.42,
+      "elapsed_ms": 6944.89,
+      "terminal_count": 1,
+      "event_count": 16,
+      "protocol_ok": true,
+      "answer_nonempty": true,
+      "source_types": [
+        "knowledge"
+      ]
+    },
+    {
+      "batch_id": "baseline-knowledge-3",
+      "scenario": "knowledge",
+      "sample_id": 2,
+      "target_concurrency": 1,
+      "request_id": "baseline-knowledge-3-2",
+      "thread_id": "0ec692bb-f40d-44da-a92d-fb83b61ec480",
+      "run_id": "ea50e5fb-6a2d-44dc-91f9-ed4eb1bb0c69",
+      "actual_routes": [
+        "direct:",
+        "single:knowledge"
+      ],
+      "http_status": 200,
+      "business_status": "completed",
+      "error_category": "none",
+      "first_event_ms": 5.5,
+      "first_content_ms": 9911.24,
+      "terminal_ms": 10600.73,
+      "elapsed_ms": 10601.01,
+      "terminal_count": 1,
+      "event_count": 16,
+      "protocol_ok": true,
+      "answer_nonempty": true,
+      "source_types": [
+        "knowledge"
+      ]
+    },
+    {
+      "batch_id": "baseline-data-1",
+      "scenario": "data",
+      "sample_id": 0,
+      "target_concurrency": 1,
+      "request_id": "baseline-data-1-0",
+      "thread_id": "42967d5a-ec91-4450-9ab9-b27b2f10aa1c",
+      "run_id": "76931a01-bd55-4e43-ad26-e5c8a166e915",
+      "actual_routes": [
+        "single:data"
+      ],
+      "http_status": 200,
+      "business_status": "completed",
+      "error_category": "none",
+      "first_event_ms": 3.67,
+      "first_content_ms": 6614.7,
+      "terminal_ms": 7515.21,
+      "elapsed_ms": 7515.78,
+      "terminal_count": 1,
+      "event_count": 18,
+      "protocol_ok": true,
+      "answer_nonempty": true,
+      "source_types": [
+        "mcp"
+      ]
+    },
+    {
+      "batch_id": "baseline-data-2",
+      "scenario": "data",
+      "sample_id": 1,
+      "target_concurrency": 1,
+      "request_id": "baseline-data-2-1",
+      "thread_id": "400914eb-943c-4133-99e3-8523daf080f3",
+      "run_id": "2e0965a1-4020-4455-b8dd-f2d6d4a1c4ab",
+      "actual_routes": [
+        "single:data",
+        "single:data"
+      ],
+      "http_status": 200,
+      "business_status": "partial",
+      "error_category": "tool_or_mcp",
+      "first_event_ms": 14.92,
+      "first_content_ms": 10133.88,
+      "terminal_ms": 11567.05,
+      "elapsed_ms": 11567.54,
+      "terminal_count": 1,
+      "event_count": 23,
+      "protocol_ok": true,
+      "answer_nonempty": true,
+      "source_types": [
+        "mcp"
+      ]
+    }
+  ]
+}

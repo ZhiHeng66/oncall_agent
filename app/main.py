@@ -13,7 +13,8 @@ from fastapi.staticfiles import StaticFiles
 from loguru import logger
 
 from app.agent.mcp_client import sanitize_error_message
-from app.api import agent, aiops, chat, file, health
+from app.api import agent, aiops, auth, chat, file, health
+from app.auth.service import authentication_service
 from app.config import config
 from app.core.milvus_client import milvus_manager
 from app.services.multi_agent_service import multi_agent_service
@@ -30,28 +31,33 @@ async def lifespan(app: FastAPI):
     logger.info(f"🌐 监听地址: http://{config.host}:{config.port}")
     logger.info(f"📚 API 文档: http://{config.host}:{config.port}/docs")
 
-    await multi_agent_service.startup()
-
-    # 连接 Milvus
-    logger.info("🔌 正在连接 Milvus...")
-    milvus_manager.connect()
-    logger.info("✅ Milvus 连接成功")
-
-    # MCP 预热失败不得阻止其余本地能力启动。
+    await authentication_service.startup()
     try:
-        await tool_registry.warmup_mcp_tools()
-    except Exception as exc:
-        logger.warning("MCP 工具预热失败，继续启动本地能力: {}", sanitize_error_message(str(exc)))
+        await multi_agent_service.startup()
 
-    logger.info("=" * 60)
+        # 连接 Milvus
+        logger.info("🔌 正在连接 Milvus...")
+        milvus_manager.connect()
+        logger.info("✅ Milvus 连接成功")
 
-    yield
+        # MCP 预热失败不得阻止其余本地能力启动。
+        try:
+            await tool_registry.warmup_mcp_tools()
+        except Exception as exc:
+            logger.warning(
+                "MCP 工具预热失败，继续启动本地能力: {}", sanitize_error_message(str(exc))
+            )
 
-    # 关闭时执行
-    await multi_agent_service.shutdown()
-    logger.info("🔌 正在关闭 Milvus 连接...")
-    milvus_manager.close()
-    logger.info(f"👋 {config.app_name} 关闭")
+        logger.info("=" * 60)
+
+        yield
+    finally:
+        # 关闭时执行
+        await multi_agent_service.shutdown()
+        await authentication_service.shutdown()
+        logger.info("🔌 正在关闭 Milvus 连接...")
+        milvus_manager.close()
+        logger.info(f"👋 {config.app_name} 关闭")
 
 
 # 创建 FastAPI 应用
@@ -61,6 +67,7 @@ app = FastAPI(
     description="基于 Supervisor-Specialist 与 LangGraph 的企业知识服务多智能体平台",
     lifespan=lifespan,
 )
+app.state.authentication_service = authentication_service
 
 # 配置 CORS
 app.add_middleware(
@@ -73,6 +80,7 @@ app.add_middleware(
 
 # 注册路由
 app.include_router(health.router, tags=["健康检查"])
+app.include_router(auth.router, prefix="/api", tags=["认证"])
 app.include_router(agent.router, prefix="/api", tags=["Multi-Agent"])
 app.include_router(chat.router, prefix="/api", tags=["对话"])
 app.include_router(file.router, prefix="/api", tags=["文件管理"])

@@ -6,6 +6,9 @@
 |---|---|---|---|
 | GET | `/` | 无 | 静态首页或应用信息 |
 | GET | `/health` | 无 | 应用及 Milvus 健康状态；异常时 HTTP 503 |
+| POST | `/api/auth/token` | 表单 `username`、`password` | Bearer access token |
+| GET | `/api/auth/me` | Bearer Token | 当前登录用户 |
+| GET | `/api/agent/threads` | Bearer Token | 当前用户的线程摘要 |
 | POST | `/api/chat` | `{"Id":"...","Question":"..."}` | 完整 JSON 回答 |
 | POST | `/api/chat_stream` | 同上 | SSE |
 | POST | `/api/chat/clear` | `{"sessionId":"..."}` | 清除结果 |
@@ -15,6 +18,10 @@
 | POST | `/api/index_directory` | query `directory_path` | 批量索引结果 |
 
 当前健康检查没有 `/api` 前缀，精确路径是 `/health`。主项目 README 中出现过 `/api/health` 的旧说明，调试时以 `app/api/health.py`、路由注册方式和 `/docs` 为准。
+
+除 `/`、`/health` 和登录入口外，业务接口要求 `Authorization: Bearer <token>`。服务端从
+令牌取得用户身份，忽略任何客户端声称的所有者；线程、Run、Trace 与工作记忆的越权读取或删除统一
+返回 404。上传和目录索引额外要求 `admin` 角色，普通用户返回 403。
 
 ## 对话 SSE
 

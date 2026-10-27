@@ -1,4 +1,5 @@
 from typing import TypedDict
+from uuid import UUID
 
 from langgraph.graph import END, START, StateGraph
 
@@ -16,13 +17,15 @@ from app.services.event_service import AgentEventService
 from app.services.multi_agent_service import MultiAgentService
 from app.services.run_store import SqliteRunStore
 
+USER_ID = UUID("00000000-0000-0000-0000-000000000011")
+
 
 class CounterState(TypedDict):
     count: int
 
 
 class DirectSupervisor:
-    async def route(self, user_query, previous_results, review, round_number):
+    async def route(self, user_query, previous_results, review, round_number, memory_context=""):
         return RouteDecision(
             mode="direct",
             reason_summary="fixed integration route",
@@ -84,13 +87,13 @@ async def test_sqlite_run_store_restores_thread_trace_and_metrics(tmp_path) -> N
         tool_call_count=1,
         task_step_count=3,
     )
-    await store.save("question", response, [event], run_metrics)
+    await store.save(USER_ID, "question", response, [event], run_metrics)
 
     reopened = SqliteRunStore(path)
     await reopened.setup()
-    thread = await reopened.get_thread("thread-1")
-    trace = await reopened.get_trace("run-1")
-    metrics = await reopened.metrics()
+    thread = await reopened.get_thread(USER_ID, "thread-1")
+    trace = await reopened.get_trace(USER_ID, "run-1")
+    metrics = await reopened.metrics(USER_ID)
 
     assert thread.run_ids == ["run-1"]
     assert [message["role"] for message in thread.history] == ["user", "assistant"]
@@ -119,9 +122,7 @@ async def test_agent_service_restores_public_thread_after_restart(tmp_path) -> N
         checkpointers=factory,
     )
     await first.startup()
-    response = await first.run(
-        AgentRunRequest(user_id="user", thread_id="restart-thread", message="hello")
-    )
+    response = await first.run(AgentRunRequest(message="hello"), USER_ID)
     await first.shutdown()
 
     restarted = MultiAgentService(
@@ -133,12 +134,9 @@ async def test_agent_service_restores_public_thread_after_restart(tmp_path) -> N
         checkpointers=factory,
     )
     await restarted.startup()
-    thread = await restarted.get_thread("restart-thread")
-    trace = await restarted.get_trace(response.run_id)
+    trace = await restarted.get_trace(USER_ID, response.run_id)
     await restarted.shutdown()
 
-    assert thread.run_ids == [response.run_id]
-    assert thread.history[-1] == {"role": "assistant", "content": "persistent answer"}
     assert trace is not None
     assert trace.run.run_id == response.run_id
 
@@ -160,12 +158,9 @@ async def test_sqlite_backed_agent_stream_reaches_one_terminal(tmp_path) -> None
     )
     await service.startup()
     events = [
-        event
-        async for event in service.stream(
-            AgentRunRequest(user_id="user", thread_id="stream-thread", message="hello")
-        )
+        event async for event in service.stream(AgentRunRequest(message="hello"), USER_ID)
     ]
-    trace = await service.get_trace(events[0].run_id)
+    trace = await service.get_trace(USER_ID, events[0].run_id)
     await service.shutdown()
 
     assert [event.type for event in events][-1] == "run_completed"

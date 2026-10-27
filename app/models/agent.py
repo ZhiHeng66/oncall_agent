@@ -28,24 +28,23 @@ PublicAgentName = Literal["supervisor", "knowledge", "data", "task", "reviewer"]
 
 class AgentRunRequest(BaseModel):
     model_config = ConfigDict(
+        extra="forbid",
         json_schema_extra={
             "example": {
-                "user_id": "user-001",
                 "thread_id": "thread-001",
                 "message": "结合内部产品手册和当前数据分析问题原因",
             }
-        }
+        },
     )
 
-    user_id: str = Field(min_length=1, max_length=128)
-    thread_id: str = Field(min_length=1, max_length=128)
+    thread_id: str = Field(default="", max_length=128)
     message: str = Field(min_length=1, max_length=4000)
 
-    @field_validator("user_id", "thread_id", "message")
+    @field_validator("thread_id", "message")
     @classmethod
     def reject_blank_values(cls, value: str) -> str:
         cleaned = value.strip()
-        if not cleaned:
+        if not cleaned and value:
             raise ValueError("value cannot be blank")
         return cleaned
 
@@ -91,6 +90,13 @@ class AgentThreadResponse(BaseModel):
     thread_id: str
     run_ids: list[str] = Field(default_factory=list)
     history: list[dict[str, str]] = Field(default_factory=list)
+
+
+class AgentThreadSummary(BaseModel):
+    thread_id: str
+    title: str = ""
+    created_at: datetime
+    updated_at: datetime
 
 
 class AgentThreadDeleteResponse(BaseModel):

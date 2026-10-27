@@ -28,6 +28,28 @@ def test_frontend_handles_all_public_terminal_events() -> None:
     assert "响应流未返回终态事件" in script
 
 
+def test_frontend_uses_session_auth_and_server_owned_threads() -> None:
+    script = (ROOT / "static" / "app.js").read_text(encoding="utf-8")
+    page = (ROOT / "static" / "index.html").read_text(encoding="utf-8")
+    styles = (ROOT / "static" / "styles.css").read_text(encoding="utf-8")
+
+    assert 'id="loginForm"' in page
+    assert 'id="logoutBtn"' in page
+    assert "[hidden]" in styles
+    assert "/auth/token" in script
+    assert "/auth/me" in script
+    assert "sessionStorage.setItem('accessToken'" in script
+    assert "sessionStorage.removeItem('accessToken')" in script
+    assert "authorizedFetch" in script
+    assert "Authorization" in script
+    assert "response.status === 401" in script
+    assert "/agent/threads" in script
+    assert "localStorage.getItem" not in script
+    assert "localStorage.setItem" not in script
+    assert "history.messages" not in script
+    assert "user_id" not in script
+
+
 def test_frontend_groups_timeline_errors_and_sources_for_readability() -> None:
     script = (ROOT / "static" / "app.js").read_text(encoding="utf-8")
     styles = (ROOT / "static" / "styles.css").read_text(encoding="utf-8")

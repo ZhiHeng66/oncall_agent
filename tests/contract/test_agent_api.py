@@ -1,11 +1,14 @@
 import json
 from importlib import import_module
 from typing import Any
+from uuid import UUID
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from app.agent.contracts import AgentTask, MultiAgentRunResult, RouteDecision
+from app.auth.contracts import CurrentUser
+from app.auth.dependencies import get_current_user
 from app.services.event_service import AgentEventService
 from app.services.multi_agent_service import MultiAgentService
 
@@ -40,21 +43,21 @@ class FakeRunner:
             termination_reason="fast_path",
         )
 
-    async def run(self, user_query, *, user_id, thread_id, run_id=None):
+    async def run(self, user_query, *, user_id, thread_id, run_id=None, **kwargs):
         mode = next(
             (item for item in ("single", "parallel", "complex") if item in user_query),
             "direct",
         )
         return self.result(run_id, thread_id, mode)
 
-    async def stream(self, user_query, *, user_id, thread_id, run_id=None):
+    async def stream(self, user_query, *, user_id, thread_id, run_id=None, **kwargs):
         yield {"type": "route_decided", "agent": "supervisor", "data": {"mode": "direct"}}
         yield {
             "type": "graph_completed",
             "result": self.result(run_id, thread_id).model_dump(mode="json"),
         }
 
-    async def delete_run_state(self, thread_id: str, run_id: str) -> None:
+    async def delete_run_state(self, user_id: str, thread_id: str, run_id: str) -> None:
         self.deleted.append((thread_id, run_id))
 
 
@@ -63,6 +66,11 @@ def build_client(monkeypatch: Any) -> TestClient:
     monkeypatch.setattr(agent_api, "multi_agent_service", service)
     app = FastAPI()
     app.include_router(agent_api.router, prefix="/api")
+    app.dependency_overrides[get_current_user] = lambda: CurrentUser(
+        user_id=UUID("00000000-0000-0000-0000-000000000011"),
+        username="test-user",
+        role="user",
+    )
     return TestClient(app)
 
 
@@ -79,7 +87,7 @@ def test_unified_json_run_and_lookup_contract(monkeypatch: Any) -> None:
 
     response = client.post(
         "/api/agent/run",
-        json={"user_id": "user", "thread_id": "thread", "message": "question"},
+        json={"message": "question"},
     )
     payload = response.json()
     lookup = client.get(f"/api/agent/runs/{payload['run_id']}")
@@ -88,7 +96,7 @@ def test_unified_json_run_and_lookup_contract(monkeypatch: Any) -> None:
 
     assert response.status_code == 200
     assert payload["status"] == "completed"
-    assert payload["thread_id"] == "thread"
+    assert payload["thread_id"]
     assert payload["answer"]
     assert payload["sources"] == []
     assert lookup.json() == payload
@@ -102,7 +110,7 @@ def test_unified_sse_envelope_and_single_terminal_contract(monkeypatch: Any) -> 
 
     response = client.post(
         "/api/agent/run_stream",
-        json={"user_id": "user", "thread_id": "thread", "message": "question"},
+        json={"message": "question"},
     )
     events = parse_sse(response.text)
 
@@ -120,15 +128,15 @@ def test_thread_lookup_and_delete_contract(monkeypatch: Any) -> None:
     client = build_client(monkeypatch)
     run = client.post(
         "/api/agent/run",
-        json={"user_id": "user", "thread_id": "thread", "message": "question"},
+        json={"message": "question"},
     ).json()
 
-    thread = client.get("/api/agent/threads/thread")
-    deleted = client.delete("/api/agent/threads/thread")
+    thread = client.get(f"/api/agent/threads/{run['thread_id']}")
+    deleted = client.delete(f"/api/agent/threads/{run['thread_id']}")
     missing = client.get(f"/api/agent/runs/{run['run_id']}")
 
     assert thread.json()["run_ids"] == [run["run_id"]]
-    assert deleted.json() == {"thread_id": "thread", "deleted_runs": 1}
+    assert deleted.json() == {"thread_id": run["thread_id"], "deleted_runs": 1}
     assert missing.status_code == 404
 
 
@@ -137,7 +145,7 @@ def test_unified_request_rejects_blank_fields(monkeypatch: Any) -> None:
 
     response = client.post(
         "/api/agent/run",
-        json={"user_id": " ", "thread_id": "thread", "message": "question"},
+        json={"user_id": " ", "message": "question"},
     )
 
     assert response.status_code == 422
@@ -150,7 +158,7 @@ def test_unified_json_entry_covers_all_top_level_route_modes(monkeypatch: Any) -
     for mode in ("direct", "single", "parallel", "complex"):
         response = client.post(
             "/api/agent/run",
-            json={"user_id": "user", "thread_id": mode, "message": mode},
+            json={"message": mode},
         )
         modes.append(response.json()["route"]["mode"])
 

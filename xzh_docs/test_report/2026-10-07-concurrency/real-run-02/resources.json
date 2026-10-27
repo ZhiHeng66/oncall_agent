@@ -1,0 +1,44 @@
+[
+  {
+    "elapsed_s": 0.12,
+    "pid": 63102,
+    "cpu_percent": 0.1,
+    "rss_kib": 28128,
+    "client_inflight": 0
+  },
+  {
+    "elapsed_s": 2.12,
+    "pid": 63102,
+    "cpu_percent": 0.1,
+    "rss_kib": 168160,
+    "client_inflight": 1
+  },
+  {
+    "elapsed_s": 4.13,
+    "pid": 63102,
+    "cpu_percent": 4.4,
+    "rss_kib": 179056,
+    "client_inflight": 1
+  },
+  {
+    "elapsed_s": 6.14,
+    "pid": 63102,
+    "cpu_percent": 3.7,
+    "rss_kib": 111344,
+    "client_inflight": 1
+  },
+  {
+    "elapsed_s": 8.15,
+    "pid": 63102,
+    "cpu_percent": 0.3,
+    "rss_kib": 179424,
+    "client_inflight": 1
+  },
+  {
+    "elapsed_s": 10.15,
+    "pid": 63102,
+    "cpu_percent": 1.1,
+    "rss_kib": 179488,
+    "client_inflight": 1
+  }
+]

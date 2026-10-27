@@ -3,7 +3,7 @@ import os
 from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from psycopg.errors import UniqueViolation
@@ -22,10 +22,11 @@ from app.services.persistence import PersistenceFactory
 from app.services.run_store import SqliteRunStore
 
 pytestmark = pytest.mark.postgres
+USER_ID = UUID("00000000-0000-0000-0000-000000000001")
 
 
 class DirectSupervisor:
-    async def route(self, user_query, previous_results, review, round_number):
+    async def route(self, user_query, previous_results, review, round_number, memory_context=""):
         return RouteDecision(
             mode="direct",
             reason_summary="postgres integration route",
@@ -69,22 +70,24 @@ def build_service(settings: Settings) -> MultiAgentService:
 
 
 async def test_two_service_instances_share_runs_and_checkpoint(postgres_settings) -> None:
-    thread_id = f"postgres-thread-{uuid4()}"
     first = build_service(postgres_settings)
     second = build_service(postgres_settings)
     await first.startup()
     await second.startup()
     try:
-        response = await first.run(
-            AgentRunRequest(user_id="user", thread_id=thread_id, message="hello")
-        )
-        shared_run = await second.get_run(response.run_id)
-        shared_thread = await second.get_thread(thread_id)
-        graph_config = {"configurable": {"thread_id": f"{thread_id}:{response.run_id}"}}
+        response = await first.run(AgentRunRequest(message="hello"), USER_ID)
+        thread_id = response.thread_id
+        shared_run = await second.get_run(USER_ID, response.run_id)
+        shared_thread = await second.get_thread(thread_id, USER_ID)
+        shared_memory = await second._working_memory_store.load(USER_ID, thread_id)
+        graph_config = {"configurable": {"thread_id": f"{USER_ID}:{thread_id}:{response.run_id}"}}
         snapshot = await second._runner.graph.aget_state(graph_config)
 
         assert shared_run == response
         assert shared_thread.run_ids == [response.run_id]
+        assert shared_memory is not None
+        assert shared_memory.version == 1
+        assert shared_memory.current_goal == "hello"
         assert snapshot.values["run_id"] == response.run_id
     finally:
         await second.shutdown()
@@ -93,21 +96,22 @@ async def test_two_service_instances_share_runs_and_checkpoint(postgres_settings
     reopened = build_service(postgres_settings)
     await reopened.startup()
     try:
-        assert await reopened.get_run(response.run_id) == response
+        assert await reopened.get_run(USER_ID, response.run_id) == response
         assert (await reopened._runner.graph.aget_state(graph_config)).values["run_id"] == (
             response.run_id
         )
-        deleted = await reopened.clear_thread(thread_id)
+        deleted = await reopened.clear_thread(thread_id, USER_ID)
+        assert await reopened._working_memory_store.load(USER_ID, thread_id) is None
         assert deleted.deleted_runs == 1
-        assert await reopened.get_run(response.run_id) is None
+        assert await reopened.get_run(USER_ID, response.run_id) is None
         assert not (await reopened._runner.graph.aget_state(graph_config)).values
     finally:
         await reopened.shutdown()
 
 
 async def test_postgres_run_store_concurrent_writes_are_complete(postgres_settings) -> None:
-    thread_id = f"concurrent-thread-{uuid4()}"
     async with PersistenceFactory(postgres_settings).open() as persistence:
+        thread_id = (await persistence.thread_store.create(USER_ID)).thread_id
         event_service = AgentEventService(postgres_settings)
 
         async def save(index: int) -> None:
@@ -125,37 +129,38 @@ async def test_postgres_run_store_concurrent_writes_are_complete(postgres_settin
                 data={"status": "completed"},
             )
             await persistence.run_store.save(
-                f"question-{index}",
+                USER_ID, f"question-{index}",
                 response,
                 [event],
                 AgentRunMetrics(duration_ms=float(index)),
             )
 
         await asyncio.gather(*(save(index) for index in range(12)))
-        thread = await persistence.run_store.get_thread(thread_id)
+        thread = await persistence.run_store.get_thread(USER_ID, thread_id)
         traces = await asyncio.gather(
-            *(persistence.run_store.get_trace(run_id) for run_id in thread.run_ids)
+            *(persistence.run_store.get_trace(USER_ID, run_id) for run_id in thread.run_ids)
         )
 
         assert len(thread.run_ids) == 12
         assert all(trace is not None and len(trace.events) == 1 for trace in traces)
-        await persistence.run_store.delete_thread(thread_id)
+        await persistence.run_store.delete_thread(USER_ID, thread_id)
 
 
 async def test_postgres_working_memory_persists_and_uses_compare_and_swap(
     postgres_settings,
 ) -> None:
-    thread_id = f"memory-thread-{uuid4()}"
     now = datetime.now(UTC)
     first = WorkingMemoryContext(
-        thread_id=thread_id,
-        owner_user_id="user",
+        thread_id="placeholder",
+        owner_user_id=str(USER_ID),
         version=1,
         current_goal="diagnose login failures",
         created_at=now,
         updated_at=now,
     )
     async with PersistenceFactory(postgres_settings).open() as persistence:
+        thread_id = (await persistence.thread_store.create(USER_ID)).thread_id
+        first = first.model_copy(update={"thread_id": thread_id})
         store = persistence.working_memory_store
         assert store is not None
         assert await store.create(first) is True
@@ -164,7 +169,7 @@ async def test_postgres_working_memory_persists_and_uses_compare_and_swap(
     async with PersistenceFactory(postgres_settings).open() as persistence:
         store = persistence.working_memory_store
         assert store is not None
-        assert await store.load(thread_id) == first
+        assert await store.load(USER_ID, thread_id) == first
         second = first.model_copy(
             update={
                 "version": 2,
@@ -177,9 +182,9 @@ async def test_postgres_working_memory_persists_and_uses_compare_and_swap(
             store.compare_and_swap(second, expected_version=1),
         )
         assert sum(results) == 1
-        assert await store.load(thread_id) == second
-        await store.delete_thread(thread_id)
-        assert await store.load(thread_id) is None
+        assert await store.load(USER_ID, thread_id) == second
+        await store.delete_thread(USER_ID, thread_id)
+        assert await store.load(USER_ID, thread_id) is None
 
 
 async def test_postgres_working_memory_schema_has_required_constraints(
@@ -206,9 +211,9 @@ async def test_postgres_working_memory_schema_has_required_constraints(
 
 
 async def test_postgres_run_store_upsert_replaces_events(postgres_settings) -> None:
-    thread_id = f"upsert-thread-{uuid4()}"
-    run_id = f"upsert-run-{uuid4()}"
     async with PersistenceFactory(postgres_settings).open() as persistence:
+        thread_id = (await persistence.thread_store.create(USER_ID)).thread_id
+        run_id = f"upsert-run-{uuid4()}"
         event_service = AgentEventService(postgres_settings)
         first = AgentRunResponse(
             run_id=run_id,
@@ -232,13 +237,13 @@ async def test_postgres_run_store_upsert_replaces_events(postgres_settings) -> N
         )
 
         await persistence.run_store.save(
-            "first question", first, [first_event], AgentRunMetrics(duration_ms=1.0)
+            USER_ID, "first question", first, [first_event], AgentRunMetrics(duration_ms=1.0)
         )
         await persistence.run_store.save(
-            "second question", second, [second_event], AgentRunMetrics(duration_ms=2.0)
+            USER_ID, "second question", second, [second_event], AgentRunMetrics(duration_ms=2.0)
         )
-        trace = await persistence.run_store.get_trace(run_id)
-        thread = await persistence.run_store.get_thread(thread_id)
+        trace = await persistence.run_store.get_trace(USER_ID, run_id)
+        thread = await persistence.run_store.get_thread(USER_ID, thread_id)
 
         assert trace is not None
         assert trace.run.answer == "second"
@@ -248,13 +253,13 @@ async def test_postgres_run_store_upsert_replaces_events(postgres_settings) -> N
             {"role": "user", "content": "second question"},
             {"role": "assistant", "content": "second"},
         ]
-        await persistence.run_store.delete_thread(thread_id)
+        await persistence.run_store.delete_thread(USER_ID, thread_id)
 
 
 async def test_postgres_run_store_rolls_back_incomplete_trace(postgres_settings) -> None:
-    thread_id = f"rollback-thread-{uuid4()}"
-    run_id = f"rollback-run-{uuid4()}"
     async with PersistenceFactory(postgres_settings).open() as persistence:
+        thread_id = (await persistence.thread_store.create(USER_ID)).thread_id
+        run_id = f"rollback-run-{uuid4()}"
         event_service = AgentEventService(postgres_settings)
         response = AgentRunResponse(
             run_id=run_id,
@@ -272,13 +277,13 @@ async def test_postgres_run_store_rolls_back_incomplete_trace(postgres_settings)
 
         with pytest.raises(UniqueViolation):
             await persistence.run_store.save(
-                "question",
+                USER_ID, "question",
                 response,
                 [event, event],
                 AgentRunMetrics(duration_ms=1.0, failed=True),
             )
 
-        assert await persistence.run_store.get_run(run_id) is None
+        assert await persistence.run_store.get_run(USER_ID, run_id) is None
 
 
 async def test_postgres_startup_rejects_missing_schema(postgres_settings) -> None:
@@ -297,8 +302,9 @@ async def test_postgres_startup_rejects_missing_schema(postgres_settings) -> Non
 async def test_sqlite_public_history_migrates_to_postgres(
     postgres_settings, tmp_path: Path
 ) -> None:
-    thread_id = f"migration-thread-{uuid4()}"
     run_id = f"migration-run-{uuid4()}"
+    async with PersistenceFactory(postgres_settings).open() as persistence:
+        thread_id = (await persistence.thread_store.create(USER_ID)).thread_id
     source = SqliteRunStore(str(tmp_path / "migration.sqlite3"))
     await source.setup()
     response = AgentRunResponse(
@@ -315,6 +321,7 @@ async def test_sqlite_public_history_migrates_to_postgres(
         data={"status": "completed"},
     )
     await source.save(
+        USER_ID,
         "migration question",
         response,
         [event],
@@ -325,11 +332,11 @@ async def test_sqlite_public_history_migrates_to_postgres(
         summary = await migrate_sqlite_run_store(
             tmp_path / "migration.sqlite3", persistence.run_store
         )
-        trace = await persistence.run_store.get_trace(run_id)
+        trace = await persistence.run_store.get_trace(USER_ID, run_id)
 
         assert summary.runs == 1
         assert summary.events == 1
         assert trace is not None
         assert trace.run == response
         assert trace.events == [event]
-        await persistence.run_store.delete_thread(thread_id)
+        await persistence.run_store.delete_thread(USER_ID, thread_id)

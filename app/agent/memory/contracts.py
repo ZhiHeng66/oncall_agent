@@ -121,6 +121,37 @@ class WorkingMemoryContext(BaseModel):
         return self
 
 
+class PublicConversationTurn(BaseModel):
+    """A bounded, public turn recovered from completed runs."""
+
+    role: Literal["user", "assistant"]
+    content: str = Field(min_length=1, max_length=8000)
+
+
+class MemoryUsage(BaseModel):
+    """Non-sensitive diagnostics for one request's memory preparation."""
+
+    status: Literal["disabled", "missing", "loaded", "failed"] = "disabled"
+    version: int | None = Field(default=None, ge=1)
+    selected_item_ids: list[str] = Field(default_factory=list, max_length=32)
+    stale_item_ids: list[str] = Field(default_factory=list, max_length=32)
+    used: bool = False
+    truncated: bool = False
+
+
+class MemoryContextView(BaseModel):
+    """Ephemeral, role-filtered source material; it is never persisted as a prompt."""
+
+    current_goal: str = ""
+    entities: dict[str, str] = Field(default_factory=dict)
+    active_items: list[MemoryItem] = Field(default_factory=list)
+    stale_items: list[MemoryItem] = Field(default_factory=list)
+    open_questions: list[str] = Field(default_factory=list)
+    next_steps: list[str] = Field(default_factory=list)
+    recent_turns: list[PublicConversationTurn] = Field(default_factory=list)
+    compressed_summary: str = ""
+
+
 class MemoryItemProposal(BaseModel):
     """A model-proposed item whose server-owned fields are assigned by the reducer."""
 

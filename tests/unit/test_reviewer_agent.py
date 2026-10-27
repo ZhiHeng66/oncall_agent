@@ -9,7 +9,7 @@ class PassingEvaluator:
     def __init__(self) -> None:
         self.calls = 0
 
-    async def evaluate(self, user_query, candidate_answer, evidence, errors):
+    async def evaluate(self, user_query, candidate_answer, evidence, errors, memory_context=""):
         self.calls += 1
         return ReviewResult(
             passed=True,

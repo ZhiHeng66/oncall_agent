@@ -1,0 +1,1929 @@
+{
+  "attempts": [
+    {
+      "attempt": "flash-run-01",
+      "stop_reason": "running",
+      "requests": 69,
+      "statuses": {
+        "completed": 58,
+        "partial": 11
+      },
+      "protocol_pass": 69,
+      "account": {
+        "role": "user",
+        "is_active": false
+      },
+      "persisted_runs": 69,
+      "working_memory_count": 69,
+      "resource_observation": {
+        "method": "macOS ps sampled every ~2s; CPU is ps average, not instant utilization",
+        "listener_pids": [
+          "17480"
+        ],
+        "samples": 152,
+        "peak_rss_kib": 721168,
+        "max_observed_ps_cpu_percent": 97.9
+      },
+      "batches": [
+        {
+          "batch_id": "baseline-knowledge-1",
+          "target": 1,
+          "peak": 1,
+          "summary": {
+            "requests": 1,
+            "statuses": {
+              "completed": 1
+            },
+            "error_categories": {
+              "none": 1
+            },
+            "http_200": 1,
+            "protocol_pass": 1,
+            "completion_rate": 1.0,
+            "completed_duration_samples": 1,
+            "completed_mean_ms": 2950.71,
+            "completed_p95_ms": 2950.71,
+            "first_content_mean_ms": 2721.56,
+            "actual_routes": {
+              "single:knowledge": 1
+            }
+          }
+        },
+        {
+          "batch_id": "baseline-knowledge-2",
+          "target": 1,
+          "peak": 1,
+          "summary": {
+            "requests": 1,
+            "statuses": {
+              "completed": 1
+            },
+            "error_categories": {
+              "none": 1
+            },
+            "http_200": 1,
+            "protocol_pass": 1,
+            "completion_rate": 1.0,
+            "completed_duration_samples": 1,
+            "completed_mean_ms": 2969.89,
+            "completed_p95_ms": 2969.89,
+            "first_content_mean_ms": 2669.52,
+            "actual_routes": {
+              "single:knowledge": 1
+            }
+          }
+        },
+        {
+          "batch_id": "baseline-knowledge-3",
+          "target": 1,
+          "peak": 1,
+          "summary": {
+            "requests": 1,
+            "statuses": {
+              "completed": 1
+            },
+            "error_categories": {
+              "none": 1
+            },
+            "http_200": 1,
+            "protocol_pass": 1,
+            "completion_rate": 1.0,
+            "completed_duration_samples": 1,
+            "completed_mean_ms": 3340.17,
+            "completed_p95_ms": 3340.17,
+            "first_content_mean_ms": 2871.94,
+            "actual_routes": {
+              "single:knowledge": 1
+            }
+          }
+        },
+        {
+          "batch_id": "baseline-data-1",
+          "target": 1,
+          "peak": 1,
+          "summary": {
+            "requests": 1,
+            "statuses": {
+              "completed": 1
+            },
+            "error_categories": {
+              "none": 1
+            },
+            "http_200": 1,
+            "protocol_pass": 1,
+            "completion_rate": 1.0,
+            "completed_duration_samples": 1,
+            "completed_mean_ms": 3186.93,
+            "completed_p95_ms": 3186.93,
+            "first_content_mean_ms": 2910.74,
+            "actual_routes": {
+              "single:knowledge": 1
+            }
+          }
+        },
+        {
+          "batch_id": "baseline-data-2",
+          "target": 1,
+          "peak": 1,
+          "summary": {
+            "requests": 1,
+            "statuses": {
+              "completed": 1
+            },
+            "error_categories": {
+              "none": 1
+            },
+            "http_200": 1,
+            "protocol_pass": 1,
+            "completion_rate": 1.0,
+            "completed_duration_samples": 1,
+            "completed_mean_ms": 2658.44,
+            "completed_p95_ms": 2658.44,
+            "first_content_mean_ms": 2307.64,
+            "actual_routes": {
+              "single:knowledge": 1
+            }
+          }
+        },
+        {
+          "batch_id": "baseline-data-3",
+          "target": 1,
+          "peak": 1,
+          "summary": {
+            "requests": 1,
+            "statuses": {
+              "completed": 1
+            },
+            "error_categories": {
+              "none": 1
+            },
+            "http_200": 1,
+            "protocol_pass": 1,
+            "completion_rate": 1.0,
+            "completed_duration_samples": 1,
+            "completed_mean_ms": 2428.26,
+            "completed_p95_ms": 2428.26,
+            "first_content_mean_ms": 2145.44,
+            "actual_routes": {
+              "single:knowledge": 1
+            }
+          }
+        },
+        {
+          "batch_id": "baseline-complex-1",
+          "target": 1,
+          "peak": 1,
+          "summary": {
+            "requests": 1,
+            "statuses": {
+              "partial": 1
+            },
+            "error_categories": {
+              "undisclosed": 1
+            },
+            "http_200": 1,
+            "protocol_pass": 1,
+            "completion_rate": 0.0,
+            "completed_duration_samples": 0,
+            "completed_mean_ms": null,
+            "completed_p95_ms": null,
+            "first_content_mean_ms": 16001.46,
+            "actual_routes": {
+              "complex:task/single:knowledge": 1
+            }
+          }
+        },
+        {
+          "batch_id": "baseline-complex-2",
+          "target": 1,
+          "peak": 1,
+          "summary": {
+            "requests": 1,
+            "statuses": {
+              "partial": 1
+            },
+            "error_categories": {
+              "other_disclosed": 1
+            },
+            "http_200": 1,
+            "protocol_pass": 1,
+            "completion_rate": 0.0,
+            "completed_duration_samples": 0,
+            "completed_mean_ms": null,
+            "completed_p95_ms": null,
+            "first_content_mean_ms": 8726.96,
+            "actual_routes": {
+              "parallel:knowledge,data/single:data": 1
+            }
+          }
+        },
+        {
+          "batch_id": "baseline-complex-3",
+          "target": 1,
+          "peak": 1,
+          "summary": {
+            "requests": 1,
+            "statuses": {
+              "partial": 1
+            },
+            "error_categories": {
+              "tool_or_mcp": 1
+            },
+            "http_200": 1,
+            "protocol_pass": 1,
+            "completion_rate": 0.0,
+            "completed_duration_samples": 0,
+            "completed_mean_ms": null,
+            "completed_p95_ms": null,
+            "first_content_mean_ms": 12799.09,
+            "actual_routes": {
+              "complex:task/single:knowledge": 1
+            }
+          }
+        },
+        {
+          "batch_id": "mixed-10-1",
+          "target": 10,
+          "peak": 9,
+          "summary": {
+            "requests": 10,
+            "statuses": {
+              "completed": 9,
+              "partial": 1
+            },
+            "error_categories": {
+              "none": 9,
+              "other_disclosed": 1
+            },
+            "http_200": 10,
+            "protocol_pass": 10,
+            "completion_rate": 0.9,
+            "completed_duration_samples": 9,
+            "completed_mean_ms": 4266.05,
+            "completed_p95_ms": 13528.06,
+            "first_content_mean_ms": 4185.07,
+            "actual_routes": {
+              "single:knowledge": 8,
+              "parallel:knowledge,data/single:data": 1,
+              "complex:task": 1
+            }
+          }
+        },
+        {
+          "batch_id": "mixed-10-2",
+          "target": 10,
+          "peak": 9,
+          "summary": {
+            "requests": 10,
+            "statuses": {
+              "completed": 9,
+              "partial": 1
+            },
+            "error_categories": {
+              "none": 9,
+              "other_disclosed": 1
+            },
+            "http_200": 10,
+            "protocol_pass": 10,
+            "completion_rate": 0.9,
+            "completed_duration_samples": 9,
+            "completed_mean_ms": 3946.52,
+            "completed_p95_ms": 12606.5,
+            "first_content_mean_ms": 4033.63,
+            "actual_routes": {
+              "single:knowledge": 8,
+              "parallel:knowledge,data/single:data": 1,
+              "complex:task": 1
+            }
+          }
+        },
+        {
+          "batch_id": "mixed-10-3",
+          "target": 10,
+          "peak": 10,
+          "summary": {
+            "requests": 10,
+            "statuses": {
+              "completed": 8,
+              "partial": 2
+            },
+            "error_categories": {
+              "none": 8,
+              "undisclosed": 2
+            },
+            "http_200": 10,
+            "protocol_pass": 10,
+            "completion_rate": 0.8,
+            "completed_duration_samples": 8,
+            "completed_mean_ms": 3282.66,
+            "completed_p95_ms": 3673.78,
+            "first_content_mean_ms": 5324.03,
+            "actual_routes": {
+              "single:knowledge": 8,
+              "complex:task": 1,
+              "complex:task/single:knowledge": 1
+            }
+          }
+        },
+        {
+          "batch_id": "mixed-30-1",
+          "target": 30,
+          "peak": 30,
+          "summary": {
+            "requests": 30,
+            "statuses": {
+              "completed": 26,
+              "partial": 4
+            },
+            "error_categories": {
+              "none": 26,
+              "other_disclosed": 3,
+              "undisclosed": 1
+            },
+            "http_200": 30,
+            "protocol_pass": 30,
+            "completion_rate": 0.8666666666666667,
+            "completed_duration_samples": 26,
+            "completed_mean_ms": 5785.99,
+            "completed_p95_ms": 16005.41,
+            "first_content_mean_ms": 5624.41,
+            "actual_routes": {
+              "single:knowledge": 24,
+              "parallel:knowledge,data/single:data": 3,
+              "complex:task/single:knowledge": 3
+            }
+          }
+        }
+      ],
+      "persistence_checks": 21,
+      "persistence_checks_pass": 21
+    }
+  ],
+  "content_checks": [
+    {
+      "attempt": "flash-run-01",
+      "request_id": "baseline-knowledge-1-0",
+      "scenario": "knowledge",
+      "sample_id": 0,
+      "business_status": "completed",
+      "termination_reason": "fast_path",
+      "source_types": [
+        "knowledge"
+      ],
+      "has_citation": true,
+      "has_public_error": false,
+      "provider_arrearage": false,
+      "no_authorized_tool_error": false,
+      "dispatch_count": 1,
+      "tool_call_count": 0,
+      "actual_routes": [
+        "single:knowledge"
+      ],
+      "expected_constraint_present": true
+    },
+    {
+      "attempt": "flash-run-01",
+      "request_id": "baseline-knowledge-2-1",
+      "scenario": "knowledge",
+      "sample_id": 1,
+      "business_status": "completed",
+      "termination_reason": "fast_path",
+      "source_types": [
+        "knowledge"
+      ],
+      "has_citation": true,
+      "has_public_error": false,
+      "provider_arrearage": false,
+      "no_authorized_tool_error": false,
+      "dispatch_count": 1,
+      "tool_call_count": 0,
+      "actual_routes": [
+        "single:knowledge"
+      ],
+      "expected_sla_markers_present": true,
+      "expected_sla_values_present": true
+    },
+    {
+      "attempt": "flash-run-01",
+      "request_id": "baseline-knowledge-3-2",
+      "scenario": "knowledge",
+      "sample_id": 2,
+      "business_status": "completed",
+      "termination_reason": "fast_path",
+      "source_types": [
+        "knowledge"
+      ],
+      "has_citation": true,
+      "has_public_error": false,
+      "provider_arrearage": false,
+      "no_authorized_tool_error": false,
+      "dispatch_count": 1,
+      "tool_call_count": 0,
+      "actual_routes": [
+        "single:knowledge"
+      ],
+      "expected_faq_markers_present": true
+    },
+    {
+      "attempt": "flash-run-01",
+      "request_id": "baseline-data-1-0",
+      "scenario": "data",
+      "sample_id": 0,
+      "business_status": "completed",
+      "termination_reason": "fast_path",
+      "source_types": [
+        "knowledge"
+      ],
+      "has_citation": true,
+      "has_public_error": false,
+      "provider_arrearage": false,
+      "no_authorized_tool_error": false,
+      "dispatch_count": 1,
+      "tool_call_count": 0,
+      "actual_routes": [
+        "single:knowledge"
+      ],
+      "dispatched_data": false,
+      "expected_ticket_and_state_present": false,
+      "other_ticket_id_present": false
+    },
+    {
+      "attempt": "flash-run-01",
+      "request_id": "baseline-data-2-1",
+      "scenario": "data",
+      "sample_id": 1,
+      "business_status": "completed",
+      "termination_reason": "fast_path",
+      "source_types": [
+        "knowledge"
+      ],
+      "has_citation": true,
+      "has_public_error": false,
+      "provider_arrearage": false,
+      "no_authorized_tool_error": false,
+      "dispatch_count": 1,
+      "tool_call_count": 0,
+      "actual_routes": [
+        "single:knowledge"
+      ],
+      "dispatched_data": false,
+      "expected_ticket_and_state_present": false,
+      "other_ticket_id_present": false
+    },
+    {
+      "attempt": "flash-run-01",
+      "request_id": "baseline-data-3-2",
+      "scenario": "data",
+      "sample_id": 2,
+      "business_status": "completed",
+      "termination_reason": "fast_path",
+      "source_types": [
+        "knowledge"
+      ],
+      "has_citation": true,
+      "has_public_error": false,
+      "provider_arrearage": false,
+      "no_authorized_tool_error": false,
+      "dispatch_count": 1,
+      "tool_call_count": 0,
+      "actual_routes": [
+        "single:knowledge"
+      ],
+      "dispatched_data": false,
+      "expected_ticket_and_state_present": false,
+      "other_ticket_id_present": false
+    },
+    {
+      "attempt": "flash-run-01",
+      "request_id": "baseline-complex-1-0",
+      "scenario": "complex",
+      "sample_id": 0,
+      "business_status": "partial",
+      "termination_reason": "review_limit",
+      "source_types": [
+        "knowledge",
+        "mcp"
+      ],
+      "has_citation": true,
+      "has_public_error": false,
+      "provider_arrearage": false,
+      "no_authorized_tool_error": false,
+      "dispatch_count": 2,
+      "tool_call_count": 2,
+      "actual_routes": [
+        "complex:task",
+        "single:knowledge"
+      ],
+      "expected_ticket_present": true,
+      "has_knowledge_and_data_sources": true
+    },
+    {
+      "attempt": "flash-run-01",
+      "request_id": "baseline-complex-2-1",
+      "scenario": "complex",
+      "sample_id": 1,
+      "business_status": "partial",
+      "termination_reason": "review_limit",
+      "source_types": [
+        "knowledge",
+        "mcp"
+      ],
+      "has_citation": true,
+      "has_public_error": true,
+      "provider_arrearage": false,
+      "no_authorized_tool_error": false,
+      "dispatch_count": 3,
+      "tool_call_count": 2,
+      "actual_routes": [
+        "parallel:knowledge,data",
+        "single:data"
+      ],
+      "expected_ticket_present": true,
+      "has_knowledge_and_data_sources": true
+    },
+    {
+      "attempt": "flash-run-01",
+      "request_id": "baseline-complex-3-2",
+      "scenario": "complex",
+      "sample_id": 2,
+      "business_status": "partial",
+      "termination_reason": "review_limit",
+      "source_types": [
+        "knowledge"
+      ],
+      "has_citation": true,
+      "has_public_error": true,
+      "provider_arrearage": false,
+      "no_authorized_tool_error": true,
+      "dispatch_count": 2,
+      "tool_call_count": 0,
+      "actual_routes": [
+        "complex:task",
+        "single:knowledge"
+      ],
+      "expected_ticket_present": true,
+      "has_knowledge_and_data_sources": false
+    },
+    {
+      "attempt": "flash-run-01",
+      "request_id": "mixed-10-1-0",
+      "scenario": "knowledge",
+      "sample_id": 0,
+      "business_status": "completed",
+      "termination_reason": "fast_path",
+      "source_types": [
+        "knowledge"
+      ],
+      "has_citation": true,
+      "has_public_error": false,
+      "provider_arrearage": false,
+      "no_authorized_tool_error": false,
+      "dispatch_count": 1,
+      "tool_call_count": 0,
+      "actual_routes": [
+        "single:knowledge"
+      ],
+      "expected_constraint_present": true
+    },
+    {
+      "attempt": "flash-run-01",
+      "request_id": "mixed-10-1-1",
+      "scenario": "data",
+      "sample_id": 1,
+      "business_status": "completed",
+      "termination_reason": "fast_path",
+      "source_types": [
+        "knowledge"
+      ],
+      "has_citation": true,
+      "has_public_error": false,
+      "provider_arrearage": false,
+      "no_authorized_tool_error": false,
+      "dispatch_count": 1,
+      "tool_call_count": 0,
+      "actual_routes": [
+        "single:knowledge"
+      ],
+      "dispatched_data": false,
+      "expected_ticket_and_state_present": false,
+      "other_ticket_id_present": false
+    },
+    {
+      "attempt": "flash-run-01",
+      "request_id": "mixed-10-1-2",
+      "scenario": "knowledge",
+      "sample_id": 2,
+      "business_status": "completed",
+      "termination_reason": "fast_path",
+      "source_types": [
+        "knowledge"
+      ],
+      "has_citation": true,
+      "has_public_error": false,
+      "provider_arrearage": false,
+      "no_authorized_tool_error": false,
+      "dispatch_count": 1,
+      "tool_call_count": 0,
+      "actual_routes": [
+        "single:knowledge"
+      ],
+      "expected_faq_markers_present": true
+    },
+    {
+      "attempt": "flash-run-01",
+      "request_id": "mixed-10-1-3",
+      "scenario": "data",
+      "sample_id": 0,
+      "business_status": "completed",
+      "termination_reason": "fast_path",
+      "source_types": [
+        "knowledge"
+      ],
+      "has_citation": true,
+      "has_public_error": false,
+      "provider_arrearage": false,
+      "no_authorized_tool_error": false,
+      "dispatch_count": 1,
+      "tool_call_count": 0,
+      "actual_routes": [
+        "single:knowledge"
+      ],
+      "dispatched_data": false,
+      "expected_ticket_and_state_present": false,
+      "other_ticket_id_present": false
+    },
+    {
+      "attempt": "flash-run-01",
+      "request_id": "mixed-10-1-6",
+      "scenario": "data",
+      "sample_id": 0,
+      "business_status": "completed",
+      "termination_reason": "fast_path",
+      "source_types": [
+        "knowledge"
+      ],
+      "has_citation": true,
+      "has_public_error": false,
+      "provider_arrearage": false,
+      "no_authorized_tool_error": false,
+      "dispatch_count": 1,
+      "tool_call_count": 0,
+      "actual_routes": [
+        "single:knowledge"
+      ],
+      "dispatched_data": false,
+      "expected_ticket_and_state_present": false,
+      "other_ticket_id_present": false
+    },
+    {
+      "attempt": "flash-run-01",
+      "request_id": "mixed-10-1-5",
+      "scenario": "knowledge",
+      "sample_id": 2,
+      "business_status": "completed",
+      "termination_reason": "fast_path",
+      "source_types": [
+        "knowledge"
+      ],
+      "has_citation": true,
+      "has_public_error": false,
+      "provider_arrearage": false,
+      "no_authorized_tool_error": false,
+      "dispatch_count": 1,
+      "tool_call_count": 0,
+      "actual_routes": [
+        "single:knowledge"
+      ],
+      "expected_faq_markers_present": true
+    },
+    {
+      "attempt": "flash-run-01",
+      "request_id": "mixed-10-1-8",
+      "scenario": "data",
+      "sample_id": 2,
+      "business_status": "completed",
+      "termination_reason": "fast_path",
+      "source_types": [
+        "knowledge"
+      ],
+      "has_citation": true,
+      "has_public_error": false,
+      "provider_arrearage": false,
+      "no_authorized_tool_error": false,
+      "dispatch_count": 1,
+      "tool_call_count": 0,
+      "actual_routes": [
+        "single:knowledge"
+      ],
+      "dispatched_data": false,
+      "expected_ticket_and_state_present": false,
+      "other_ticket_id_present": false
+    },
+    {
+      "attempt": "flash-run-01",
+      "request_id": "mixed-10-1-7",
+      "scenario": "knowledge",
+      "sample_id": 1,
+      "business_status": "completed",
+      "termination_reason": "fast_path",
+      "source_types": [
+        "knowledge"
+      ],
+      "has_citation": true,
+      "has_public_error": false,
+      "provider_arrearage": false,
+      "no_authorized_tool_error": false,
+      "dispatch_count": 1,
+      "tool_call_count": 0,
+      "actual_routes": [
+        "single:knowledge"
+      ],
+      "expected_sla_markers_present": true,
+      "expected_sla_values_present": true
+    },
+    {
+      "attempt": "flash-run-01",
+      "request_id": "mixed-10-1-4",
+      "scenario": "complex",
+      "sample_id": 1,
+      "business_status": "partial",
+      "termination_reason": "review_limit",
+      "source_types": [
+        "knowledge",
+        "mcp"
+      ],
+      "has_citation": true,
+      "has_public_error": true,
+      "provider_arrearage": false,
+      "no_authorized_tool_error": false,
+      "dispatch_count": 3,
+      "tool_call_count": 2,
+      "actual_routes": [
+        "parallel:knowledge,data",
+        "single:data"
+      ],
+      "expected_ticket_present": true,
+      "has_knowledge_and_data_sources": true
+    },
+    {
+      "attempt": "flash-run-01",
+      "request_id": "mixed-10-1-9",
+      "scenario": "complex",
+      "sample_id": 0,
+      "business_status": "completed",
+      "termination_reason": "review_passed",
+      "source_types": [
+        "knowledge",
+        "mcp"
+      ],
+      "has_citation": true,
+      "has_public_error": false,
+      "provider_arrearage": false,
+      "no_authorized_tool_error": false,
+      "dispatch_count": 1,
+      "tool_call_count": 1,
+      "actual_routes": [
+        "complex:task"
+      ],
+      "expected_ticket_present": true,
+      "has_knowledge_and_data_sources": true
+    },
+    {
+      "attempt": "flash-run-01",
+      "request_id": "mixed-10-2-0",
+      "scenario": "knowledge",
+      "sample_id": 0,
+      "business_status": "completed",
+      "termination_reason": "fast_path",
+      "source_types": [
+        "knowledge"
+      ],
+      "has_citation": true,
+      "has_public_error": false,
+      "provider_arrearage": false,
+      "no_authorized_tool_error": false,
+      "dispatch_count": 1,
+      "tool_call_count": 0,
+      "actual_routes": [
+        "single:knowledge"
+      ],
+      "expected_constraint_present": true
+    },
+    {
+      "attempt": "flash-run-01",
+      "request_id": "mixed-10-2-1",
+      "scenario": "data",
+      "sample_id": 1,
+      "business_status": "completed",
+      "termination_reason": "fast_path",
+      "source_types": [
+        "knowledge"
+      ],
+      "has_citation": true,
+      "has_public_error": false,
+      "provider_arrearage": false,
+      "no_authorized_tool_error": false,
+      "dispatch_count": 1,
+      "tool_call_count": 0,
+      "actual_routes": [
+        "single:knowledge"
+      ],
+      "dispatched_data": false,
+      "expected_ticket_and_state_present": false,
+      "other_ticket_id_present": false
+    },
+    {
+      "attempt": "flash-run-01",
+      "request_id": "mixed-10-2-2",
+      "scenario": "knowledge",
+      "sample_id": 2,
+      "business_status": "completed",
+      "termination_reason": "fast_path",
+      "source_types": [
+        "knowledge"
+      ],
+      "has_citation": true,
+      "has_public_error": false,
+      "provider_arrearage": false,
+      "no_authorized_tool_error": false,
+      "dispatch_count": 1,
+      "tool_call_count": 0,
+      "actual_routes": [
+        "single:knowledge"
+      ],
+      "expected_faq_markers_present": true
+    },
+    {
+      "attempt": "flash-run-01",
+      "request_id": "mixed-10-2-3",
+      "scenario": "data",
+      "sample_id": 0,
+      "business_status": "completed",
+      "termination_reason": "fast_path",
+      "source_types": [
+        "knowledge"
+      ],
+      "has_citation": true,
+      "has_public_error": false,
+      "provider_arrearage": false,
+      "no_authorized_tool_error": false,
+      "dispatch_count": 1,
+      "tool_call_count": 0,
+      "actual_routes": [
+        "single:knowledge"
+      ],
+      "dispatched_data": false,
+      "expected_ticket_and_state_present": false,
+      "other_ticket_id_present": false
+    },
+    {
+      "attempt": "flash-run-01",
+      "request_id": "mixed-10-2-6",
+      "scenario": "data",
+      "sample_id": 0,
+      "business_status": "completed",
+      "termination_reason": "fast_path",
+      "source_types": [
+        "knowledge"
+      ],
+      "has_citation": true,
+      "has_public_error": false,
+      "provider_arrearage": false,
+      "no_authorized_tool_error": false,
+      "dispatch_count": 1,
+      "tool_call_count": 0,
+      "actual_routes": [
+        "single:knowledge"
+      ],
+      "dispatched_data": false,
+      "expected_ticket_and_state_present": false,
+      "other_ticket_id_present": false
+    },
+    {
+      "attempt": "flash-run-01",
+      "request_id": "mixed-10-2-5",
+      "scenario": "knowledge",
+      "sample_id": 2,
+      "business_status": "completed",
+      "termination_reason": "fast_path",
+      "source_types": [
+        "knowledge"
+      ],
+      "has_citation": true,
+      "has_public_error": false,
+      "provider_arrearage": false,
+      "no_authorized_tool_error": false,
+      "dispatch_count": 1,
+      "tool_call_count": 0,
+      "actual_routes": [
+        "single:knowledge"
+      ],
+      "expected_faq_markers_present": true
+    },
+    {
+      "attempt": "flash-run-01",
+      "request_id": "mixed-10-2-8",
+      "scenario": "data",
+      "sample_id": 2,
+      "business_status": "completed",
+      "termination_reason": "fast_path",
+      "source_types": [
+        "knowledge"
+      ],
+      "has_citation": true,
+      "has_public_error": false,
+      "provider_arrearage": false,
+      "no_authorized_tool_error": false,
+      "dispatch_count": 1,
+      "tool_call_count": 0,
+      "actual_routes": [
+        "single:knowledge"
+      ],
+      "dispatched_data": false,
+      "expected_ticket_and_state_present": false,
+      "other_ticket_id_present": false
+    },
+    {
+      "attempt": "flash-run-01",
+      "request_id": "mixed-10-2-7",
+      "scenario": "knowledge",
+      "sample_id": 1,
+      "business_status": "completed",
+      "termination_reason": "fast_path",
+      "source_types": [
+        "knowledge"
+      ],
+      "has_citation": true,
+      "has_public_error": false,
+      "provider_arrearage": false,
+      "no_authorized_tool_error": false,
+      "dispatch_count": 1,
+      "tool_call_count": 0,
+      "actual_routes": [
+        "single:knowledge"
+      ],
+      "expected_sla_markers_present": true,
+      "expected_sla_values_present": true
+    },
+    {
+      "attempt": "flash-run-01",
+      "request_id": "mixed-10-2-4",
+      "scenario": "complex",
+      "sample_id": 1,
+      "business_status": "partial",
+      "termination_reason": "review_limit",
+      "source_types": [
+        "knowledge",
+        "mcp"
+      ],
+      "has_citation": true,
+      "has_public_error": true,
+      "provider_arrearage": false,
+      "no_authorized_tool_error": false,
+      "dispatch_count": 3,
+      "tool_call_count": 4,
+      "actual_routes": [
+        "parallel:knowledge,data",
+        "single:data"
+      ],
+      "expected_ticket_present": true,
+      "has_knowledge_and_data_sources": true
+    },
+    {
+      "attempt": "flash-run-01",
+      "request_id": "mixed-10-2-9",
+      "scenario": "complex",
+      "sample_id": 0,
+      "business_status": "completed",
+      "termination_reason": "review_passed",
+      "source_types": [
+        "knowledge",
+        "mcp"
+      ],
+      "has_citation": true,
+      "has_public_error": false,
+      "provider_arrearage": false,
+      "no_authorized_tool_error": false,
+      "dispatch_count": 1,
+      "tool_call_count": 1,
+      "actual_routes": [
+        "complex:task"
+      ],
+      "expected_ticket_present": true,
+      "has_knowledge_and_data_sources": true
+    },
+    {
+      "attempt": "flash-run-01",
+      "request_id": "mixed-10-3-0",
+      "scenario": "knowledge",
+      "sample_id": 0,
+      "business_status": "completed",
+      "termination_reason": "fast_path",
+      "source_types": [
+        "knowledge"
+      ],
+      "has_citation": true,
+      "has_public_error": false,
+      "provider_arrearage": false,
+      "no_authorized_tool_error": false,
+      "dispatch_count": 1,
+      "tool_call_count": 0,
+      "actual_routes": [
+        "single:knowledge"
+      ],
+      "expected_constraint_present": true
+    },
+    {
+      "attempt": "flash-run-01",
+      "request_id": "mixed-10-3-1",
+      "scenario": "data",
+      "sample_id": 1,
+      "business_status": "completed",
+      "termination_reason": "fast_path",
+      "source_types": [
+        "knowledge"
+      ],
+      "has_citation": true,
+      "has_public_error": false,
+      "provider_arrearage": false,
+      "no_authorized_tool_error": false,
+      "dispatch_count": 1,
+      "tool_call_count": 0,
+      "actual_routes": [
+        "single:knowledge"
+      ],
+      "dispatched_data": false,
+      "expected_ticket_and_state_present": false,
+      "other_ticket_id_present": false
+    },
+    {
+      "attempt": "flash-run-01",
+      "request_id": "mixed-10-3-3",
+      "scenario": "data",
+      "sample_id": 0,
+      "business_status": "completed",
+      "termination_reason": "fast_path",
+      "source_types": [
+        "knowledge"
+      ],
+      "has_citation": true,
+      "has_public_error": false,
+      "provider_arrearage": false,
+      "no_authorized_tool_error": false,
+      "dispatch_count": 1,
+      "tool_call_count": 0,
+      "actual_routes": [
+        "single:knowledge"
+      ],
+      "dispatched_data": false,
+      "expected_ticket_and_state_present": false,
+      "other_ticket_id_present": false
+    },
+    {
+      "attempt": "flash-run-01",
+      "request_id": "mixed-10-3-2",
+      "scenario": "knowledge",
+      "sample_id": 2,
+      "business_status": "completed",
+      "termination_reason": "fast_path",
+      "source_types": [
+        "knowledge"
+      ],
+      "has_citation": true,
+      "has_public_error": false,
+      "provider_arrearage": false,
+      "no_authorized_tool_error": false,
+      "dispatch_count": 1,
+      "tool_call_count": 0,
+      "actual_routes": [
+        "single:knowledge"
+      ],
+      "expected_faq_markers_present": true
+    },
+    {
+      "attempt": "flash-run-01",
+      "request_id": "mixed-10-3-5",
+      "scenario": "knowledge",
+      "sample_id": 2,
+      "business_status": "completed",
+      "termination_reason": "fast_path",
+      "source_types": [
+        "knowledge"
+      ],
+      "has_citation": true,
+      "has_public_error": false,
+      "provider_arrearage": false,
+      "no_authorized_tool_error": false,
+      "dispatch_count": 1,
+      "tool_call_count": 0,
+      "actual_routes": [
+        "single:knowledge"
+      ],
+      "expected_faq_markers_present": true
+    },
+    {
+      "attempt": "flash-run-01",
+      "request_id": "mixed-10-3-6",
+      "scenario": "data",
+      "sample_id": 0,
+      "business_status": "completed",
+      "termination_reason": "fast_path",
+      "source_types": [
+        "knowledge"
+      ],
+      "has_citation": true,
+      "has_public_error": false,
+      "provider_arrearage": false,
+      "no_authorized_tool_error": false,
+      "dispatch_count": 1,
+      "tool_call_count": 0,
+      "actual_routes": [
+        "single:knowledge"
+      ],
+      "dispatched_data": false,
+      "expected_ticket_and_state_present": false,
+      "other_ticket_id_present": false
+    },
+    {
+      "attempt": "flash-run-01",
+      "request_id": "mixed-10-3-7",
+      "scenario": "knowledge",
+      "sample_id": 1,
+      "business_status": "completed",
+      "termination_reason": "fast_path",
+      "source_types": [
+        "knowledge"
+      ],
+      "has_citation": true,
+      "has_public_error": false,
+      "provider_arrearage": false,
+      "no_authorized_tool_error": false,
+      "dispatch_count": 1,
+      "tool_call_count": 0,
+      "actual_routes": [
+        "single:knowledge"
+      ],
+      "expected_sla_markers_present": true,
+      "expected_sla_values_present": true
+    },
+    {
+      "attempt": "flash-run-01",
+      "request_id": "mixed-10-3-8",
+      "scenario": "data",
+      "sample_id": 2,
+      "business_status": "completed",
+      "termination_reason": "fast_path",
+      "source_types": [
+        "knowledge"
+      ],
+      "has_citation": true,
+      "has_public_error": false,
+      "provider_arrearage": false,
+      "no_authorized_tool_error": false,
+      "dispatch_count": 1,
+      "tool_call_count": 0,
+      "actual_routes": [
+        "single:knowledge"
+      ],
+      "dispatched_data": false,
+      "expected_ticket_and_state_present": false,
+      "other_ticket_id_present": false
+    },
+    {
+      "attempt": "flash-run-01",
+      "request_id": "mixed-10-3-4",
+      "scenario": "complex",
+      "sample_id": 1,
+      "business_status": "partial",
+      "termination_reason": "review_rejected",
+      "source_types": [
+        "knowledge",
+        "mcp"
+      ],
+      "has_citation": true,
+      "has_public_error": false,
+      "provider_arrearage": false,
+      "no_authorized_tool_error": false,
+      "dispatch_count": 1,
+      "tool_call_count": 1,
+      "actual_routes": [
+        "complex:task"
+      ],
+      "expected_ticket_present": false,
+      "has_knowledge_and_data_sources": true
+    },
+    {
+      "attempt": "flash-run-01",
+      "request_id": "mixed-10-3-9",
+      "scenario": "complex",
+      "sample_id": 0,
+      "business_status": "partial",
+      "termination_reason": "review_limit",
+      "source_types": [
+        "knowledge",
+        "mcp"
+      ],
+      "has_citation": true,
+      "has_public_error": false,
+      "provider_arrearage": false,
+      "no_authorized_tool_error": false,
+      "dispatch_count": 2,
+      "tool_call_count": 1,
+      "actual_routes": [
+        "complex:task",
+        "single:knowledge"
+      ],
+      "expected_ticket_present": true,
+      "has_knowledge_and_data_sources": true
+    },
+    {
+      "attempt": "flash-run-01",
+      "request_id": "mixed-30-1-2",
+      "scenario": "knowledge",
+      "sample_id": 2,
+      "business_status": "completed",
+      "termination_reason": "fast_path",
+      "source_types": [
+        "knowledge"
+      ],
+      "has_citation": true,
+      "has_public_error": false,
+      "provider_arrearage": false,
+      "no_authorized_tool_error": false,
+      "dispatch_count": 1,
+      "tool_call_count": 0,
+      "actual_routes": [
+        "single:knowledge"
+      ],
+      "expected_faq_markers_present": true
+    },
+    {
+      "attempt": "flash-run-01",
+      "request_id": "mixed-30-1-5",
+      "scenario": "knowledge",
+      "sample_id": 2,
+      "business_status": "completed",
+      "termination_reason": "fast_path",
+      "source_types": [
+        "knowledge"
+      ],
+      "has_citation": true,
+      "has_public_error": false,
+      "provider_arrearage": false,
+      "no_authorized_tool_error": false,
+      "dispatch_count": 1,
+      "tool_call_count": 0,
+      "actual_routes": [
+        "single:knowledge"
+      ],
+      "expected_faq_markers_present": true
+    },
+    {
+      "attempt": "flash-run-01",
+      "request_id": "mixed-30-1-0",
+      "scenario": "knowledge",
+      "sample_id": 0,
+      "business_status": "completed",
+      "termination_reason": "fast_path",
+      "source_types": [
+        "knowledge"
+      ],
+      "has_citation": true,
+      "has_public_error": false,
+      "provider_arrearage": false,
+      "no_authorized_tool_error": false,
+      "dispatch_count": 1,
+      "tool_call_count": 0,
+      "actual_routes": [
+        "single:knowledge"
+      ],
+      "expected_constraint_present": true
+    },
+    {
+      "attempt": "flash-run-01",
+      "request_id": "mixed-30-1-6",
+      "scenario": "data",
+      "sample_id": 0,
+      "business_status": "completed",
+      "termination_reason": "fast_path",
+      "source_types": [
+        "knowledge"
+      ],
+      "has_citation": true,
+      "has_public_error": false,
+      "provider_arrearage": false,
+      "no_authorized_tool_error": false,
+      "dispatch_count": 1,
+      "tool_call_count": 0,
+      "actual_routes": [
+        "single:knowledge"
+      ],
+      "dispatched_data": false,
+      "expected_ticket_and_state_present": false,
+      "other_ticket_id_present": false
+    },
+    {
+      "attempt": "flash-run-01",
+      "request_id": "mixed-30-1-3",
+      "scenario": "data",
+      "sample_id": 0,
+      "business_status": "completed",
+      "termination_reason": "fast_path",
+      "source_types": [
+        "knowledge"
+      ],
+      "has_citation": true,
+      "has_public_error": false,
+      "provider_arrearage": false,
+      "no_authorized_tool_error": false,
+      "dispatch_count": 1,
+      "tool_call_count": 0,
+      "actual_routes": [
+        "single:knowledge"
+      ],
+      "dispatched_data": false,
+      "expected_ticket_and_state_present": false,
+      "other_ticket_id_present": false
+    },
+    {
+      "attempt": "flash-run-01",
+      "request_id": "mixed-30-1-11",
+      "scenario": "data",
+      "sample_id": 2,
+      "business_status": "completed",
+      "termination_reason": "fast_path",
+      "source_types": [
+        "knowledge"
+      ],
+      "has_citation": true,
+      "has_public_error": false,
+      "provider_arrearage": false,
+      "no_authorized_tool_error": false,
+      "dispatch_count": 1,
+      "tool_call_count": 0,
+      "actual_routes": [
+        "single:knowledge"
+      ],
+      "dispatched_data": false,
+      "expected_ticket_and_state_present": false,
+      "other_ticket_id_present": false
+    },
+    {
+      "attempt": "flash-run-01",
+      "request_id": "mixed-30-1-10",
+      "scenario": "knowledge",
+      "sample_id": 1,
+      "business_status": "completed",
+      "termination_reason": "fast_path",
+      "source_types": [
+        "knowledge"
+      ],
+      "has_citation": true,
+      "has_public_error": false,
+      "provider_arrearage": false,
+      "no_authorized_tool_error": false,
+      "dispatch_count": 1,
+      "tool_call_count": 0,
+      "actual_routes": [
+        "single:knowledge"
+      ],
+      "expected_sla_markers_present": true,
+      "expected_sla_values_present": true
+    },
+    {
+      "attempt": "flash-run-01",
+      "request_id": "mixed-30-1-1",
+      "scenario": "data",
+      "sample_id": 1,
+      "business_status": "completed",
+      "termination_reason": "fast_path",
+      "source_types": [
+        "knowledge"
+      ],
+      "has_citation": true,
+      "has_public_error": false,
+      "provider_arrearage": false,
+      "no_authorized_tool_error": false,
+      "dispatch_count": 1,
+      "tool_call_count": 0,
+      "actual_routes": [
+        "single:knowledge"
+      ],
+      "dispatched_data": false,
+      "expected_ticket_and_state_present": false,
+      "other_ticket_id_present": false
+    },
+    {
+      "attempt": "flash-run-01",
+      "request_id": "mixed-30-1-7",
+      "scenario": "knowledge",
+      "sample_id": 1,
+      "business_status": "completed",
+      "termination_reason": "fast_path",
+      "source_types": [
+        "knowledge"
+      ],
+      "has_citation": true,
+      "has_public_error": false,
+      "provider_arrearage": false,
+      "no_authorized_tool_error": false,
+      "dispatch_count": 1,
+      "tool_call_count": 0,
+      "actual_routes": [
+        "single:knowledge"
+      ],
+      "expected_sla_markers_present": true,
+      "expected_sla_values_present": true
+    },
+    {
+      "attempt": "flash-run-01",
+      "request_id": "mixed-30-1-13",
+      "scenario": "data",
+      "sample_id": 1,
+      "business_status": "completed",
+      "termination_reason": "fast_path",
+      "source_types": [
+        "knowledge"
+      ],
+      "has_citation": true,
+      "has_public_error": false,
+      "provider_arrearage": false,
+      "no_authorized_tool_error": false,
+      "dispatch_count": 1,
+      "tool_call_count": 0,
+      "actual_routes": [
+        "single:knowledge"
+      ],
+      "dispatched_data": false,
+      "expected_ticket_and_state_present": false,
+      "other_ticket_id_present": false
+    },
+    {
+      "attempt": "flash-run-01",
+      "request_id": "mixed-30-1-15",
+      "scenario": "knowledge",
+      "sample_id": 0,
+      "business_status": "completed",
+      "termination_reason": "fast_path",
+      "source_types": [
+        "knowledge"
+      ],
+      "has_citation": true,
+      "has_public_error": false,
+      "provider_arrearage": false,
+      "no_authorized_tool_error": false,
+      "dispatch_count": 1,
+      "tool_call_count": 0,
+      "actual_routes": [
+        "single:knowledge"
+      ],
+      "expected_constraint_present": true
+    },
+    {
+      "attempt": "flash-run-01",
+      "request_id": "mixed-30-1-12",
+      "scenario": "knowledge",
+      "sample_id": 0,
+      "business_status": "completed",
+      "termination_reason": "fast_path",
+      "source_types": [
+        "knowledge"
+      ],
+      "has_citation": true,
+      "has_public_error": false,
+      "provider_arrearage": false,
+      "no_authorized_tool_error": false,
+      "dispatch_count": 1,
+      "tool_call_count": 0,
+      "actual_routes": [
+        "single:knowledge"
+      ],
+      "expected_constraint_present": true
+    },
+    {
+      "attempt": "flash-run-01",
+      "request_id": "mixed-30-1-16",
+      "scenario": "data",
+      "sample_id": 1,
+      "business_status": "completed",
+      "termination_reason": "fast_path",
+      "source_types": [
+        "knowledge"
+      ],
+      "has_citation": true,
+      "has_public_error": false,
+      "provider_arrearage": false,
+      "no_authorized_tool_error": false,
+      "dispatch_count": 1,
+      "tool_call_count": 0,
+      "actual_routes": [
+        "single:knowledge"
+      ],
+      "dispatched_data": false,
+      "expected_ticket_and_state_present": false,
+      "other_ticket_id_present": false
+    },
+    {
+      "attempt": "flash-run-01",
+      "request_id": "mixed-30-1-17",
+      "scenario": "knowledge",
+      "sample_id": 2,
+      "business_status": "completed",
+      "termination_reason": "fast_path",
+      "source_types": [
+        "knowledge"
+      ],
+      "has_citation": true,
+      "has_public_error": false,
+      "provider_arrearage": false,
+      "no_authorized_tool_error": false,
+      "dispatch_count": 1,
+      "tool_call_count": 0,
+      "actual_routes": [
+        "single:knowledge"
+      ],
+      "expected_faq_markers_present": true
+    },
+    {
+      "attempt": "flash-run-01",
+      "request_id": "mixed-30-1-8",
+      "scenario": "data",
+      "sample_id": 2,
+      "business_status": "completed",
+      "termination_reason": "fast_path",
+      "source_types": [
+        "knowledge"
+      ],
+      "has_citation": true,
+      "has_public_error": false,
+      "provider_arrearage": false,
+      "no_authorized_tool_error": false,
+      "dispatch_count": 1,
+      "tool_call_count": 0,
+      "actual_routes": [
+        "single:knowledge"
+      ],
+      "dispatched_data": false,
+      "expected_ticket_and_state_present": false,
+      "other_ticket_id_present": false
+    },
+    {
+      "attempt": "flash-run-01",
+      "request_id": "mixed-30-1-21",
+      "scenario": "data",
+      "sample_id": 0,
+      "business_status": "completed",
+      "termination_reason": "fast_path",
+      "source_types": [
+        "knowledge"
+      ],
+      "has_citation": true,
+      "has_public_error": false,
+      "provider_arrearage": false,
+      "no_authorized_tool_error": false,
+      "dispatch_count": 1,
+      "tool_call_count": 0,
+      "actual_routes": [
+        "single:knowledge"
+      ],
+      "dispatched_data": false,
+      "expected_ticket_and_state_present": false,
+      "other_ticket_id_present": false
+    },
+    {
+      "attempt": "flash-run-01",
+      "request_id": "mixed-30-1-20",
+      "scenario": "knowledge",
+      "sample_id": 2,
+      "business_status": "completed",
+      "termination_reason": "fast_path",
+      "source_types": [
+        "knowledge"
+      ],
+      "has_citation": true,
+      "has_public_error": false,
+      "provider_arrearage": false,
+      "no_authorized_tool_error": false,
+      "dispatch_count": 1,
+      "tool_call_count": 0,
+      "actual_routes": [
+        "single:knowledge"
+      ],
+      "expected_faq_markers_present": true
+    },
+    {
+      "attempt": "flash-run-01",
+      "request_id": "mixed-30-1-18",
+      "scenario": "data",
+      "sample_id": 0,
+      "business_status": "completed",
+      "termination_reason": "fast_path",
+      "source_types": [
+        "knowledge"
+      ],
+      "has_citation": true,
+      "has_public_error": false,
+      "provider_arrearage": false,
+      "no_authorized_tool_error": false,
+      "dispatch_count": 1,
+      "tool_call_count": 0,
+      "actual_routes": [
+        "single:knowledge"
+      ],
+      "dispatched_data": false,
+      "expected_ticket_and_state_present": false,
+      "other_ticket_id_present": false
+    },
+    {
+      "attempt": "flash-run-01",
+      "request_id": "mixed-30-1-23",
+      "scenario": "data",
+      "sample_id": 2,
+      "business_status": "completed",
+      "termination_reason": "fast_path",
+      "source_types": [
+        "knowledge"
+      ],
+      "has_citation": true,
+      "has_public_error": false,
+      "provider_arrearage": false,
+      "no_authorized_tool_error": false,
+      "dispatch_count": 1,
+      "tool_call_count": 0,
+      "actual_routes": [
+        "single:knowledge"
+      ],
+      "dispatched_data": false,
+      "expected_ticket_and_state_present": false,
+      "other_ticket_id_present": false
+    },
+    {
+      "attempt": "flash-run-01",
+      "request_id": "mixed-30-1-22",
+      "scenario": "knowledge",
+      "sample_id": 1,
+      "business_status": "completed",
+      "termination_reason": "fast_path",
+      "source_types": [
+        "knowledge"
+      ],
+      "has_citation": true,
+      "has_public_error": false,
+      "provider_arrearage": false,
+      "no_authorized_tool_error": false,
+      "dispatch_count": 1,
+      "tool_call_count": 0,
+      "actual_routes": [
+        "single:knowledge"
+      ],
+      "expected_sla_markers_present": true,
+      "expected_sla_values_present": true
+    },
+    {
+      "attempt": "flash-run-01",
+      "request_id": "mixed-30-1-26",
+      "scenario": "data",
+      "sample_id": 2,
+      "business_status": "completed",
+      "termination_reason": "fast_path",
+      "source_types": [
+        "knowledge"
+      ],
+      "has_citation": true,
+      "has_public_error": false,
+      "provider_arrearage": false,
+      "no_authorized_tool_error": false,
+      "dispatch_count": 1,
+      "tool_call_count": 0,
+      "actual_routes": [
+        "single:knowledge"
+      ],
+      "dispatched_data": false,
+      "expected_ticket_and_state_present": false,
+      "other_ticket_id_present": false
+    },
+    {
+      "attempt": "flash-run-01",
+      "request_id": "mixed-30-1-25",
+      "scenario": "knowledge",
+      "sample_id": 1,
+      "business_status": "completed",
+      "termination_reason": "fast_path",
+      "source_types": [
+        "knowledge"
+      ],
+      "has_citation": true,
+      "has_public_error": false,
+      "provider_arrearage": false,
+      "no_authorized_tool_error": false,
+      "dispatch_count": 1,
+      "tool_call_count": 0,
+      "actual_routes": [
+        "single:knowledge"
+      ],
+      "expected_sla_markers_present": true,
+      "expected_sla_values_present": true
+    },
+    {
+      "attempt": "flash-run-01",
+      "request_id": "mixed-30-1-27",
+      "scenario": "knowledge",
+      "sample_id": 0,
+      "business_status": "completed",
+      "termination_reason": "fast_path",
+      "source_types": [
+        "knowledge"
+      ],
+      "has_citation": true,
+      "has_public_error": false,
+      "provider_arrearage": false,
+      "no_authorized_tool_error": false,
+      "dispatch_count": 1,
+      "tool_call_count": 0,
+      "actual_routes": [
+        "single:knowledge"
+      ],
+      "expected_constraint_present": true
+    },
+    {
+      "attempt": "flash-run-01",
+      "request_id": "mixed-30-1-28",
+      "scenario": "data",
+      "sample_id": 1,
+      "business_status": "completed",
+      "termination_reason": "fast_path",
+      "source_types": [
+        "knowledge"
+      ],
+      "has_citation": true,
+      "has_public_error": false,
+      "provider_arrearage": false,
+      "no_authorized_tool_error": false,
+      "dispatch_count": 1,
+      "tool_call_count": 0,
+      "actual_routes": [
+        "single:knowledge"
+      ],
+      "dispatched_data": false,
+      "expected_ticket_and_state_present": false,
+      "other_ticket_id_present": false
+    },
+    {
+      "attempt": "flash-run-01",
+      "request_id": "mixed-30-1-19",
+      "scenario": "complex",
+      "sample_id": 1,
+      "business_status": "partial",
+      "termination_reason": "review_limit",
+      "source_types": [
+        "knowledge",
+        "mcp"
+      ],
+      "has_citation": true,
+      "has_public_error": true,
+      "provider_arrearage": false,
+      "no_authorized_tool_error": false,
+      "dispatch_count": 3,
+      "tool_call_count": 2,
+      "actual_routes": [
+        "parallel:knowledge,data",
+        "single:data"
+      ],
+      "expected_ticket_present": true,
+      "has_knowledge_and_data_sources": true
+    },
+    {
+      "attempt": "flash-run-01",
+      "request_id": "mixed-30-1-14",
+      "scenario": "complex",
+      "sample_id": 2,
+      "business_status": "partial",
+      "termination_reason": "review_limit",
+      "source_types": [
+        "knowledge",
+        "mcp"
+      ],
+      "has_citation": true,
+      "has_public_error": true,
+      "provider_arrearage": false,
+      "no_authorized_tool_error": false,
+      "dispatch_count": 3,
+      "tool_call_count": 2,
+      "actual_routes": [
+        "parallel:knowledge,data",
+        "single:data"
+      ],
+      "expected_ticket_present": true,
+      "has_knowledge_and_data_sources": true
+    },
+    {
+      "attempt": "flash-run-01",
+      "request_id": "mixed-30-1-4",
+      "scenario": "complex",
+      "sample_id": 1,
+      "business_status": "partial",
+      "termination_reason": "review_limit",
+      "source_types": [
+        "knowledge",
+        "mcp"
+      ],
+      "has_citation": true,
+      "has_public_error": true,
+      "provider_arrearage": false,
+      "no_authorized_tool_error": false,
+      "dispatch_count": 3,
+      "tool_call_count": 2,
+      "actual_routes": [
+        "parallel:knowledge,data",
+        "single:data"
+      ],
+      "expected_ticket_present": true,
+      "has_knowledge_and_data_sources": true
+    },
+    {
+      "attempt": "flash-run-01",
+      "request_id": "mixed-30-1-9",
+      "scenario": "complex",
+      "sample_id": 0,
+      "business_status": "completed",
+      "termination_reason": "review_passed",
+      "source_types": [
+        "knowledge",
+        "mcp"
+      ],
+      "has_citation": true,
+      "has_public_error": false,
+      "provider_arrearage": false,
+      "no_authorized_tool_error": false,
+      "dispatch_count": 2,
+      "tool_call_count": 1,
+      "actual_routes": [
+        "complex:task",
+        "single:knowledge"
+      ],
+      "expected_ticket_present": true,
+      "has_knowledge_and_data_sources": true
+    },
+    {
+      "attempt": "flash-run-01",
+      "request_id": "mixed-30-1-24",
+      "scenario": "complex",
+      "sample_id": 0,
+      "business_status": "completed",
+      "termination_reason": "review_passed",
+      "source_types": [
+        "knowledge",
+        "mcp"
+      ],
+      "has_citation": true,
+      "has_public_error": false,
+      "provider_arrearage": false,
+      "no_authorized_tool_error": false,
+      "dispatch_count": 2,
+      "tool_call_count": 1,
+      "actual_routes": [
+        "complex:task",
+        "single:knowledge"
+      ],
+      "expected_ticket_present": true,
+      "has_knowledge_and_data_sources": true
+    },
+    {
+      "attempt": "flash-run-01",
+      "request_id": "mixed-30-1-29",
+      "scenario": "complex",
+      "sample_id": 2,
+      "business_status": "partial",
+      "termination_reason": "review_limit",
+      "source_types": [
+        "knowledge",
+        "mcp"
+      ],
+      "has_citation": true,
+      "has_public_error": false,
+      "provider_arrearage": false,
+      "no_authorized_tool_error": false,
+      "dispatch_count": 2,
+      "tool_call_count": 1,
+      "actual_routes": [
+        "complex:task",
+        "single:knowledge"
+      ],
+      "expected_ticket_present": true,
+      "has_knowledge_and_data_sources": true
+    }
+  ],
+  "submitted_requests": 69,
+  "counts": {
+    "completed": 58,
+    "partial": 11
+  },
+  "stop_reasons": [
+    "running"
+  ],
+  "levels_not_executed": [
+    50,
+    100
+  ],
+  "semantic_check_limit": "keyword/evidence checks only, not full answer grading"
+}

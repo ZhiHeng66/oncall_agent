@@ -6,7 +6,7 @@
 import os
 from typing import Any, Literal
 
-from pydantic import Field, model_validator
+from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _ENV_FILE = None if os.getenv("ONCALL_DISABLE_ENV_FILE") == "1" else ".env"
@@ -26,13 +26,14 @@ class Settings(BaseSettings):
     app_name: str = "Enterprise Knowledge Multi-Agent Platform"
     app_version: str = "2.0.0"
     debug: bool = False
-    host: str = "0.0.0.0"
+    # Intentional container-friendly bind default; production network policy restricts exposure.
+    host: str = "0.0.0.0"  # nosec B104
     port: int = 9900
 
     # DashScope 配置
     dashscope_api_key: str = ""  # 默认空字符串，实际使用需从环境变量加载
     dashscope_base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
-    dashscope_model: str = "qwen-max"
+    dashscope_model: str = "qwen-plus"
     dashscope_embedding_model: str = "text-embedding-v4"  # v4 支持多种维度（默认 1024）
 
     # Milvus 配置
@@ -43,10 +44,11 @@ class Settings(BaseSettings):
     # RAG 配置
     rag_top_k: int = 3
     knowledge_min_relevance_score: float = 0.3
-    rag_model: str = "qwen-max"  # 使用快速响应模型，不带扩展思考
-    supervisor_model: str = "qwen-max"
-    specialist_model: str = "qwen-max"
-    reviewer_model: str = "qwen-max"
+    rag_model: str = "qwen-plus"
+    supervisor_model: str = "qwen-plus"
+    specialist_model: str = "qwen-plus"
+    reviewer_model: str = "qwen-plus"
+    llm_enable_thinking: bool = False
     chat_temperature: float = 0.7
     agent_temperature: float = 0.0
     llm_timeout_seconds: float = 60.0
@@ -67,12 +69,20 @@ class Settings(BaseSettings):
     mcp_tool_cache_ttl_seconds: float = 300.0
 
     # Agent 运行限制
-    checkpointer_backend: Literal["memory", "sqlite", "postgres"] = "sqlite"
+    checkpointer_backend: Literal["memory", "sqlite", "postgres"] = "postgres"
     checkpoint_path: str = "data/multi_agent.sqlite3"
-    database_url: str = ""
+    database_url: str = (
+        "postgresql://oncall_agent:replace-with-postgres-password@localhost:5432/oncall_agent"
+    )
     postgres_pool_min_size: int = Field(default=1, ge=0)
     postgres_pool_max_size: int = Field(default=10, ge=1)
     postgres_connect_timeout_seconds: float = Field(default=10.0, gt=0)
+
+    # 本地单租户认证。启用后用户目录依赖 PostgreSQL。
+    auth_enabled: bool = False
+    jwt_secret_key: SecretStr = SecretStr("")
+    jwt_algorithm: Literal["HS256"] = "HS256"
+    jwt_access_token_expire_minutes: int = Field(default=30, ge=1, le=1440)
     supervisor_max_rounds: int = 4
     task_max_steps: int = 8
     reviewer_max_retries: int = 1
@@ -123,6 +133,12 @@ class Settings(BaseSettings):
                 "WORKING_MEMORY_COMPRESSION_THRESHOLD cannot exceed "
                 "WORKING_MEMORY_CONTEXT_MAX_CHARS"
             )
+        if self.auth_enabled:
+            secret = self.jwt_secret_key.get_secret_value()
+            if len(secret) < 32 or secret.startswith("replace-with-"):
+                raise ValueError(
+                    "JWT_SECRET_KEY must be a non-placeholder secret with at least 32 characters"
+                )
         return self
 
     @property

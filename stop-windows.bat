@@ -46,7 +46,7 @@ if errorlevel 1 (
 echo.
 
 REM 停止 Docker 容器
-echo [5/5] 停止 Milvus 容器...
+echo [5/6] 停止 Milvus 容器...
 docker ps --format "{{.Names}}" | findstr "milvus" >nul 2>&1
 if not errorlevel 1 (
     docker compose -f vector-database.yml down
@@ -57,6 +57,16 @@ if not errorlevel 1 (
     )
 ) else (
     echo [信息] Milvus 容器未运行
+)
+echo.
+
+REM 停止 PostgreSQL 容器（保留数据卷）
+echo [6/6] 停止 PostgreSQL 容器...
+docker compose -f postgres-database.yml down
+if errorlevel 1 (
+    echo [错误] PostgreSQL 容器停止失败
+) else (
+    echo [成功] PostgreSQL 容器已停止
 )
 echo.
 

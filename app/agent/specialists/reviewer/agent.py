@@ -22,6 +22,7 @@ class ReviewEvaluator(Protocol):
         candidate_answer: str,
         evidence: list[Evidence],
         errors: list[str],
+        memory_context: str = "",
     ) -> ReviewResult: ...
 
 
@@ -35,6 +36,7 @@ class LLMReviewEvaluator:
         candidate_answer: str,
         evidence: list[Evidence],
         errors: list[str],
+        memory_context: str = "",
     ) -> ReviewResult:
         model = self._model or llm_factory.create_chat_model(role="reviewer")
         chain = REVIEW_PROMPT | model.with_structured_output(ReviewResult)
@@ -44,6 +46,7 @@ class LLMReviewEvaluator:
                 "candidate_answer": candidate_answer,
                 "evidence_summary": self._format_evidence(evidence),
                 "errors": "；".join(errors) or "无",
+                "memory_context": memory_context or "无",
             }
         )
         return (
@@ -76,18 +79,24 @@ class ReviewerAgent:
         candidate_answer: str,
         evidence: list[Evidence],
         errors: list[str],
+        memory_context: str = "",
     ) -> ReviewResult:
-        deterministic = self._deterministic_review(candidate_answer, evidence, errors)
+        deterministic = self._deterministic_review(
+            candidate_answer, evidence, errors, memory_context
+        )
         if deterministic is not None:
             return deterministic
         evaluator = self._evaluator or LLMReviewEvaluator()
-        return await evaluator.evaluate(user_query, candidate_answer, evidence, errors)
+        return await evaluator.evaluate(
+            user_query, candidate_answer, evidence, errors, memory_context
+        )
 
     @staticmethod
     def _deterministic_review(
         candidate_answer: str,
         evidence: list[Evidence],
         errors: list[str],
+        memory_context: str = "",
     ) -> ReviewResult | None:
         issues: list[str] = []
         retry_target: RetryTarget = "supervisor"
@@ -104,6 +113,12 @@ class ReviewerAgent:
         if errors and not any(marker in candidate_answer for marker in ("失败", "错误", "未完成")):
             issues.append("候选答案没有披露已记录的工具或 Agent 错误。")
             retry_target = "supervisor"
+        current_markers = ("当前", "已恢复", "无告警", "正常")
+        if "过期动态观察" in memory_context and any(
+            marker in candidate_answer for marker in current_markers
+        ):
+            issues.append("候选答案将过期动态观察表述为当前状态，必须重新查询。")
+            retry_target = "data"
         if not issues:
             return None
         return ReviewResult(

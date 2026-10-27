@@ -6,12 +6,12 @@ from app.agent.supervisor.agent import SupervisorAgent
 
 
 class RaisingRouter:
-    async def decide(self, user_query, previous_results, review, round_number):
+    async def decide(self, user_query, previous_results, review, round_number, memory_context=""):
         raise RuntimeError("router unavailable")
 
 
 class UnexpectedRouter:
-    async def decide(self, user_query, previous_results, review, round_number):
+    async def decide(self, user_query, previous_results, review, round_number, memory_context=""):
         raise AssertionError("directed retry must not ask the router")
 
 

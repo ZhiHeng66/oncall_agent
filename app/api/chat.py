@@ -4,12 +4,15 @@
 """
 
 import json
+from typing import Annotated
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from loguru import logger
 from sse_starlette.sse import EventSourceResponse
 
 from app.agent.mcp_client import format_exception_chain, sanitize_error_message
+from app.auth.contracts import CurrentUser
+from app.auth.dependencies import get_current_user
 from app.models.agent import AgentRunRequest
 from app.models.request import ChatRequest, ClearRequest
 from app.models.response import ApiResponse, SessionInfoResponse
@@ -19,7 +22,9 @@ router = APIRouter()
 
 
 @router.post("/chat")
-async def chat(request: ChatRequest):
+async def chat(
+    request: ChatRequest, current_user: Annotated[CurrentUser, Depends(get_current_user)]
+):
     """快速对话接口
     {
         "code": 200,
@@ -40,7 +45,7 @@ async def chat(request: ChatRequest):
     try:
         logger.info(f"[会话 {request.id}] 收到统一 Agent 快速请求")
         result = await multi_agent_service.run(
-            AgentRunRequest(user_id=request.id, thread_id=request.id, message=request.question)
+            AgentRunRequest(thread_id=request.id, message=request.question), current_user.user_id
         )
 
         logger.info(f"[会话 {request.id}] 快速对话完成")
@@ -68,7 +73,9 @@ async def chat(request: ChatRequest):
 
 
 @router.post("/chat_stream")
-async def chat_stream(request: ChatRequest):
+async def chat_stream(
+    request: ChatRequest, current_user: Annotated[CurrentUser, Depends(get_current_user)]
+):
     """流式对话接口（基于 RAG Agent，SSE）
 
     返回 SSE 格式，data 字段为 JSON：
@@ -96,11 +103,10 @@ async def chat_stream(request: ChatRequest):
     async def event_generator():
         try:
             stream_request = AgentRunRequest(
-                user_id=request.id,
                 thread_id=request.id,
                 message=request.question,
             )
-            async for event in multi_agent_service.stream(stream_request):
+            async for event in multi_agent_service.stream(stream_request, current_user.user_id):
                 if event.type == "content_delta":
                     yield {
                         "event": "message",
@@ -147,7 +153,9 @@ async def chat_stream(request: ChatRequest):
 
 
 @router.post("/chat/clear", response_model=ApiResponse)
-async def clear_session(request: ClearRequest):
+async def clear_session(
+    request: ClearRequest, current_user: Annotated[CurrentUser, Depends(get_current_user)]
+):
     """清空会话历史
 
     Args:
@@ -157,7 +165,7 @@ async def clear_session(request: ClearRequest):
         操作结果
     """
     try:
-        await multi_agent_service.clear_thread(request.session_id)
+        await multi_agent_service.clear_thread(request.session_id, current_user.user_id)
         logger.info(f"清空会话: {request.session_id}")
 
         return ApiResponse(
@@ -172,7 +180,9 @@ async def clear_session(request: ClearRequest):
 
 
 @router.get("/chat/session/{session_id}", response_model=SessionInfoResponse)
-async def get_session_info(session_id: str) -> SessionInfoResponse:
+async def get_session_info(
+    session_id: str, current_user: Annotated[CurrentUser, Depends(get_current_user)]
+) -> SessionInfoResponse:
     """查询会话历史
 
     Args:
@@ -182,7 +192,7 @@ async def get_session_info(session_id: str) -> SessionInfoResponse:
         会话信息
     """
     try:
-        thread = await multi_agent_service.get_thread(session_id)
+        thread = await multi_agent_service.get_thread(session_id, current_user.user_id)
 
         return SessionInfoResponse(
             session_id=session_id,

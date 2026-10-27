@@ -1,0 +1,70 @@
+{
+  "environment": {
+    "utc_started": "2026-10-07T13:29:50.548721+00:00",
+    "platform": "macOS-26.5.1-arm64-arm-64bit-Mach-O",
+    "python": "3.13.9",
+    "httpx": "0.28.1",
+    "base_url": "http://127.0.0.1:9900",
+    "commit": "c4968257aba423c5b206f67532e0ccf1f8057685",
+    "branch": "multi-agents",
+    "dirty_worktree": true,
+    "model_configuration": "not inspected: server-owned; no .env read",
+    "model_quota": "unknown",
+    "server_workers": "unknown",
+    "milvus_document_count": "unknown",
+    "billing": "not measured",
+    "startup_window_s": 3,
+    "timeout_s": 300,
+    "batch_pause_s": 30,
+    "max_requests": 579,
+    "max_duration_s": 7200
+  },
+  "stop_reason": "blocked_authentication",
+  "batches": [],
+  "checks": [
+    {
+      "check": "local_port",
+      "port": 9900,
+      "reachable": true
+    },
+    {
+      "check": "local_port",
+      "port": 5432,
+      "reachable": true
+    },
+    {
+      "check": "local_port",
+      "port": 19530,
+      "reachable": true
+    },
+    {
+      "check": "local_port",
+      "port": 8003,
+      "reachable": true
+    },
+    {
+      "check": "local_port",
+      "port": 8004,
+      "reachable": true
+    },
+    {
+      "check": "local_port",
+      "port": 8005,
+      "reachable": true
+    },
+    {
+      "check": "/health",
+      "http_status": 200
+    },
+    {
+      "check": "/api/auth/me",
+      "http_status": 401
+    },
+    {
+      "check": "/api/agent/threads",
+      "http_status": 401
+    }
+  ],
+  "created_threads": [],
+  "rows": []
+}

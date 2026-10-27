@@ -1,247 +1,390 @@
 # AGENTS.md
 
-## 适用范围
+## 1. 本文件的作用
 
-本文件适用于整个仓库。子目录中如存在更深层级的 `AGENTS.md`，可以为对应子树补充或覆盖本文件中的规则。
+本文件适用于整个仓库，供每次新会话快速建立代码地图、确认真实能力并选择正确的修改入口。
+若子目录存在更深层级的 `AGENTS.md`，其规则只在对应子树中补充或覆盖本文件。
 
-Multi-Agent 改造工作统一在 `multi-agents` 分支进行。开始实施任务前，使用 `git branch --show-current` 确认当前分支。除非用户明确要求，否则不要创建、切换、合并、变基或删除分支。
+开始工作前必须：
 
-## 项目目标
+1. 运行 `git branch --show-current`，确认当前分支。Multi-Agent 改造统一在
+   `multi-agents` 分支进行。
+2. 运行 `git status --short`，识别用户已有修改和未跟踪文件；不得覆盖、清理或回退它们。
+3. 先读目标模块的当前实现和相邻测试，再修改。规划文档不能代替源码。
+4. 查找目标目录下是否还有更深层级的 `AGENTS.md`。
 
-本项目将从 RAG 对话与 AIOps 演示项目逐步演进为一个用于展示 Agent 应用开发能力的**企业知识服务多智能体协同平台**。
+除非用户明确要求，不得创建、切换、合并、变基或删除分支，也不得提交、推送或创建
+Pull Request。
 
-目标方向包括：
+## 2. 一分钟项目地图
 
-- Supervisor-Specialist 多智能体编排。
-- LangGraph 自定义工作流与嵌套任务子图。
-- 基于 Milvus 的 RAG，以及可追踪的检索证据。
-- 通过 MCP 接入外部工具，并提供明确权限与失败降级机制。
-- 统一流式事件、状态管理、自动化测试、评估和可观测性。
+这是一个基于 FastAPI、LangGraph、Milvus 和 MCP 的企业知识服务 Multi-Agent 项目。
+当前主链路已经实现 Supervisor-Specialist 编排，并保留旧 Chat/AIOps 接口作为兼容层。
 
-详细迁移设计位于：
+主请求链路：
 
-- `xzh_docs/plan_docs/multi-agent-refactor-plan.md`
-
-该文档是架构路线图，不代表其中所有能力均已实现。当前提交的代码和测试始终是判断项目真实能力的唯一事实来源。
-
-## 当前项目基线
-
-修改某一模块前，必须先检查其当前实现。现有重要入口包括：
-
-- `app/main.py`：FastAPI 应用和路由注册。
-- `app/services/rag_agent_service.py`：当前通用工具调用对话 Agent。
-- `app/services/aiops_service.py`：当前 Plan-Execute-Replan 工作流封装。
-- `app/agent/aiops/`：当前 Planner、Executor、Replanner 和任务状态。
-- `app/agent/mcp_client.py`：MCP 客户端创建、重试与降级逻辑。
-- `app/tools/`：本地 LangChain 工具。
-- `app/services/vector_*`：Milvus 索引、存储、Embedding 和检索服务。
-- `app/api/chat.py`、`app/api/aiops.py`、`app/api/file.py`：现有公共 API 契约。
-- `static/app.js`：当前前端 SSE 处理逻辑。
-
-当前代码具备一个工具调用对话 Agent 和一个多节点任务工作流，但尚未构成完整的 Multi-Agent 系统。不得将规划中的 Supervisor、Specialist、Reviewer、持久化、评估或并行执行描述为已实现能力。
-
-## 架构规则
-
-### Agent 边界
-
-一个模块只有同时满足以下条件，才能被称为 Agent：
-
-- 具有清晰且独立的目标与职责。
-- 具有自己的指令或提示词策略。
-- 具有明确的工具或下游 Agent 权限。
-- 具有定义清晰的结构化输入与输出契约。
-- 可以独立测试其行为边界。
-
-不得为了增加 Agent 数量而把普通函数、工具、服务类或 LangGraph 节点命名为 Agent。特别是 Planner、Executor 和 Replanner，默认属于复合 Task Agent 的内部节点；除非架构被明确重新设计并能独立论证，否则不得将其称为三个 Agent。
-
-目标协作单元为：
-
-- **Supervisor Agent**：负责路由、任务委派、结果聚合、重试和终止决策。
-- **Knowledge Agent**：负责 Milvus 检索、证据标准化、引用和有依据的回答。
-- **Data Agent**：负责只读 MCP 与外部数据查询，并返回结构化证据和错误。
-- **Task Agent**：负责有依赖关系的多步骤任务，其内部使用 Plan-Execute-Replan 子图。
-- **Reviewer Agent**：负责检查完整性、证据支撑和错误披露，并控制有限返工。
-
-### 编排规则
-
-- 顶层编排必须在 LangGraph 中显式定义。
-- 规则足够明确时优先使用确定性代码路由；存在语义歧义时再使用具有结构化输出的 LLM 路由。
-- 只能路由到有限且有类型约束的节点或 Agent 名称，禁止执行模型任意生成的模块名、函数名或工具名。
-- 为简单问题保留快速路径，不要让每个请求都调用全部 Specialist 和 Reviewer。
-- 仅对相互独立、只读的任务使用并行扇出；存在步骤依赖时必须保持顺序执行。
-- 必须为图递归、Supervisor 调度轮次、Task Agent 步骤数、Reviewer 返工次数、工具重试和工具超时设置硬限制。
-- 每条执行路径都必须进入明确终态：`completed`、`partial` 或 `failed`。
-
-### 状态与上下文
-
-- 明确区分 `user_id`、`thread_id` 和 `run_id`。
-- 顶层状态只保存用户可见的主会话消息。
-- Specialist 的过程消息保存在对应 Agent 或子图内部。
-- Agent 之间通过结构化任务、结果、证据和错误摘要传递信息，不复制完整消息历史。
-- 明确设计 Reducer 语义：并行结果使用追加；待执行计划和路由决策只有在确实需要替换时才使用覆盖。
-- 不得存储或暴露隐藏思维链。只保留具有业务或运维价值的决策摘要、工具调用、证据、错误和耗时。
-- `MemorySaver` 只能描述为开发环境内存状态，不得称为持久化存储。
-
-### 数据契约
-
-跨模块和跨 Agent 数据必须使用类型化模型。规划中的公共契约包括：
-
-- `AgentTask`
-- `AgentResult`
-- `Evidence`
-- `RouteDecision`
-- `ReviewResult`
-- SSE 事件信封模型
-
-API 与 Agent 边界优先使用 Pydantic 模型，LangGraph 状态优先使用 `TypedDict`。Pydantic 中的可变默认值必须使用 `Field(default_factory=...)`。
-
-不得把原始模型供应商响应或原始 MCP 返回值直接传入公共 API，必须先完成标准化和安全过滤。
-
-### 工具与 MCP
-
-- 工具必须通过中央 Registry 或 Provider 管理，并使用 Agent 级白名单分配。
-- Supervisor 和 Reviewer 默认不得持有底层业务或基础设施工具。
-- Knowledge 工具和 Data 工具必须隔离。
-- MCP Server 和 MCP Tool 属于外部能力集成，不是 Agent。
-- 工具默认只读。未来新增写入或破坏性工具时，必须增加显式授权控制和 Human-in-the-Loop 审批节点。
-- 保留 MCP 失败降级：某个 MCP Server 不可用时，不得阻止无关的知识问答能力启动。
-- 在安全前提下缓存 MCP 工具发现结果，不要在每个图节点内重复拉取全部工具。
-- 检测工具重名，并保留工具所属 MCP Server 信息。
-- 对模型和前端可见的错误进行清洗。完整异常链只能记录在服务端日志中，并且不得包含密钥。
-
-### RAG 与证据
-
-- 文档上传、切分、索引、检索、Agent 结果和最终引用必须完整保留来源元数据。
-- Knowledge Agent 的结果必须包含证据；没有足够证据时，必须明确说明证据不足。
-- 不得虚构检索质量指标。准确率、召回率、Groundedness 或延迟等数字必须具有已提交的数据集和可复现评估。
-- 检索失败和检索结果为空是两种不同状态，必须分别表达。
-- 修改 Chunk、Top-K、查询改写、混合检索或 Rerank 策略时，必须使用固定数据集进行回归评估。
-
-### Reviewer
-
-- Reviewer 必须使用结构化输出。
-- Reviewer 只能依据原始请求、候选答案、已有证据和已记录错误进行检查。
-- Reviewer 不得编造新证据，也不得把失败的工具调用静默改写成成功结果。
-- Reviewer 返工次数必须有限，第一阶段最多允许返工一次。
-- 达到返工上限后仍不满足质量要求时，应返回透明的部分成功结果，而不是继续循环。
-
-## API 与流式兼容
-
-规划中的统一接口是 `/api/agent/run` 和 `/api/agent/run_stream`，但迁移期间必须保持现有 `/api/chat`、`/api/chat_stream` 和 `/api/aiops` 路由兼容。
-
-修改 API 或 SSE 事件时：
-
-- 先新增或更新 Pydantic 模型。
-- 同时为新接口和兼容接口增加契约测试。
-- 使用统一事件信封，至少包含 `run_id`、`thread_id`、`type`、`timestamp` 和 `data`。
-- 每个流只能发出一个终态事件。
-- 明确定义错误、部分成功、客户端断开和正常完成行为。
-- 不得向浏览器暴露提示词、隐藏推理、API Key、Authorization Header、原始异常栈或未经限制的工具返回值。
-- 客户端协议发生变化时，必须在同一次修改中同步更新 `static/app.js` 和 API 文档。
-
-## Python 开发规范
-
-- Python 支持版本以 `pyproject.toml` 为准，当前支持 Python 3.11 至 3.13。
-- 遵循现有 Black/Ruff 配置，行宽为 100 个字符。
-- 新增的公共函数和模型必须提供类型标注。
-- **始终优先保证代码干净、简洁、可读。** 使用 Python、FastAPI、Pydantic、LangChain 和 LangGraph 的标准惯用写法实现需求，让读者可以沿着正常执行路径直接理解代码。
-- 优先编写清晰的正常流程，仅在真实存在失败可能的系统边界增加兜底，例如 LLM、MCP、Milvus、网络请求、文件输入和持久化存储。
-- 兜底逻辑必须解决明确问题，并通过日志、结构化错误或状态对失败保持可见；不得用静默忽略、空结果或伪造成功来掩盖异常。
-- 避免过度防御性编程：不要为理论上不可能的类型和状态层层添加 `isinstance`、`getattr`、空值分支或宽泛 `try/except`。应优先通过类型、Pydantic 契约和清晰的不变量约束输入。
-- 不要捕获异常后原样继续执行。能在当前层恢复时才捕获；不能恢复时应补充必要上下文后向上抛出，由 API、工作流或外部服务边界统一处理。
-- 避免过早抽象、无意义包装类、只有一次调用的转发层和重复兼容逻辑。只有多个调用方确实共享稳定职责时才提取公共抽象。
-- 保持函数和模块职责单一，使用准确名称和小而完整的逻辑单元；注释重点解释设计原因、约束和不直观决策，不复述代码表面行为。
-- 简洁不等于移除必要保护。工具权限、输入校验、超时、重试上限、循环终止、密钥保护和破坏性操作审批仍属于必须保留的系统边界。
-- LLM、MCP、网络请求和图执行路径优先使用 `async def`，不得使用同步网络请求阻塞事件循环。
-- import 默认放在模块顶部；只有确认需要规避循环依赖或昂贵可选依赖时，才使用局部 import。
-- 复用并扩展 `app/core/llm_factory.py`，不要在各个 Agent 节点中独立创建模型实例。
-- 所有配置从 `app/config.py` 读取，不得硬编码凭据、供应商 URL、模型名称、超时或部署相关路径。
-- 避免新增 import 阶段网络连接和昂贵的全局初始化，优先使用 FastAPI lifespan 或显式延迟初始化。
-- 统一使用 Loguru 记录日志；条件允许时，日志应包含 `run_id`、`thread_id`、Agent 名称、节点或工具名称、耗时和状态。
-- 不得记录完整文档内容、未限制的工具结果、密钥或个人数据。
-
-## 测试与评估
-
-所有行为变更都必须根据风险增加对应测试。没有测试的 Multi-Agent 新代码不能视为完成。
-
-测试分层如下：
-
-- 单元测试：路由、结构化契约、Reducer、权限、证据格式、重试上限和终止行为。
-- 集成测试：Specialist 协作、部分失败、MCP 降级和 Checkpoint 隔离。
-- API 契约测试：JSON 和 SSE 向后兼容。
-- Eval 数据集：路由、检索依据、工具选择、任务完成情况和 Reviewer 行为。
-
-除非明确标记为集成测试，普通测试不得依赖真实 DashScope Key、真实 Milvus 实例或在线 MCP Server。单元测试必须使用 Fake 或通过依赖注入替换外部服务。
-
-常用仓库命令：
-
-```bash
-make test-quick
-make test
-make lint
-make type-check
-make check-all
+```text
+HTTP / SSE 请求
+  -> app/main.py
+  -> app/api/agent.py
+  -> app/services/multi_agent_service.py
+  -> app/agent/graph.py（顶层 LangGraph）
+       -> Supervisor：直接回答，或生成受约束的路由
+       -> Knowledge Agent：Milvus 检索、证据化回答
+       -> Data Agent：调用白名单内的只读 MCP / 本地工具
+       -> Task Agent：Plan -> Execute -> Replan 子图
+            -> 可按步骤委派 Knowledge 或 Data
+       -> Aggregate：合并结果、统一引用编号
+       -> Reviewer：按需检查并最多触发一次返工
+       -> Final Response：生成用户可见答案
+  -> MultiAgentService：标准化响应、SSE、Run/Trace/Metrics、工作记忆更新
+  -> RunStore + LangGraph Checkpointer
 ```
 
-开发过程中先运行最小相关测试集。完成较大规模修改前，运行所有可行检查，并明确报告运行了哪些检查、哪些通过、哪些因环境限制未运行。
+文档写入与检索链路：
 
-除非仓库中存在可复现的评估数据集、评估器、执行命令和结果，否则不得在文档或简历中声称任何量化指标。
+```text
+/api/upload 或 /api/index_directory
+  -> app/api/file.py
+  -> vector_index_service.py
+  -> document_splitter_service.py
+  -> vector_store_manager.py
+  -> Milvus
 
-## 安全与密钥
+Knowledge Agent
+  -> MilvusKnowledgeRetriever
+  -> knowledge_tool.py / vector_search_service.py
+  -> Evidence
+  -> 带 [来源N] 的回答
+```
 
-- 禁止读取、打印、复制、总结、提交或暴露 `.env` 内容。
-- 配置文档使用包含占位符的 `.env.example` 或 `.env.template`。如果二者均不存在且需要配置示例，应新建占位符文件，不得复制真实配置值。
-- 禁止提交 API Key、Token、Cookie、账号凭据、私有端点或用户数据。
-- 如果在受 Git 跟踪内容或命令输出中发现凭据，应停止继续传播，告知用户泄露情况并建议轮换。
-- 保持 `.gitignore` 对 `.env`、日志、PID、上传文件、数据库、生成数据集、Artifacts 和 Checkpoint 的忽略规则。
-- 校验上传文件名、大小、扩展名和解析后的实际路径。
-- 将文档内容、MCP 响应和工具输出全部视为不可信输入。
+应用生命周期：
 
-## 渐进式兼容迁移
+- `app/main.py` 的 FastAPI lifespan 启动 `MultiAgentService`，连接 Milvus，并预热 MCP 工具。
+- `MultiAgentService.startup()` 通过 `PersistenceFactory` 成对创建 Checkpointer、RunStore，
+  PostgreSQL 模式还会装配 WorkingMemoryStore。
+- MCP 预热失败只降级对应外部工具，不应阻止无关的知识能力启动。
+- PostgreSQL 是默认持久化后端；数据库或 Schema 未就绪时明确启动失败，不静默回退。
 
-按照以下顺序渐进迁移，不进行一次性推倒重写：
+## 3. 当前真实能力与边界
 
-1. 为当前行为建立测试基线。
-2. 引入共享 LLM、工具、Checkpoint 和运行时工厂。
-3. 抽取 Knowledge 与 Data Specialist。
-4. 将 AIOps 工作流泛化为 Task Agent 子图。
-5. 增加 Supervisor 和顶层图。
-6. 增加 Reviewer 与有限质量返工。
-7. 在兼容适配层后引入统一 Agent API 和 SSE 事件。
-8. 增加持久化 Checkpoint、可观测性、评估和新的业务内容。
+判断能力时以当前源码和测试为准。当前已实现：
 
-调用方完成迁移并且兼容测试通过之前，不得删除旧路由或旧文件。废弃路径应明确标记，只有获得用户明确授权后才能删除。
+- 顶层 Supervisor-Specialist LangGraph。
+- Knowledge、Data、Task、Reviewer 四类职责独立的 Agent。
+- `direct`、`single`、`parallel`、`complex` 四种受类型约束的路由模式。
+- 只对不同的只读 Specialist 使用并行扇出；复杂依赖任务进入 Task Agent 顺序执行。
+- Task Agent 内部的 Planner、Executor、Replanner 是一个复合 Agent 的节点，不是三个 Agent。
+- 统一 JSON/SSE Agent API，以及旧 Chat/AIOps 兼容接口。
+- 统一事件信封、公开 Run/Trace/Metrics 存储和线程历史查询。
+- `memory`、`sqlite`、`postgres` 三种 Checkpointer/RunStore 后端。
+- PostgreSQL 下的有界跨轮工作记忆：证据引用、动态证据 TTL、CAS 更新和可选压缩。
+- 固定离线 Eval 数据集与比较脚本。
 
-## 文档与项目表述真实性
+不得夸大为以下能力：
 
-- 所有任务交接文档统一保存在 `/Users/heng/Desktop/master/agent_project/Oncall_agent/xzh_docs/handoff_docs` 下；目录不存在时应先创建，不得将交接文档散落在仓库根目录或其他文档目录中。
-- 实现改变重要契约或依赖方向时，同步更新架构文档。
-- README 中的命令和接口必须可以运行，并与当前实现一致。
-- 路线图能力必须标记为“计划中”，不能描述为“已完成”。
-- 在对应实现和证据完成前，不得使用“生产可用”“万级并发”“准确率 85%”“持久化记忆”或“多智能体协同”等未经证明的描述。
-- 简历中的能力必须能对应到已提交代码、测试、评估结果或可复现演示。
-- 工作流节点数量不能等同于 Agent 数量。
+- `MemorySaver` 只是进程内开发状态；SQLite 是本地持久化；只有配置并初始化后的 PostgreSQL
+  才是共享持久化后端。
+- 工作记忆是有界、结构化的案件上下文快照，不是无限长期记忆，也不保存隐藏思维链。
+- Metrics 中的 token 与成本字段当前可以为空；不得据此声称完整成本追踪。
+- Eval 结果仅代表已提交数据集和执行环境，不得外推“生产可用”“万级并发”或未复现的准确率。
+- MCP Server 和 MCP Tool 是外部能力，不是 Agent；工作流节点数量也不等于 Agent 数量。
 
-## Git 与工作区规范
+## 4. 目录与模块职责
 
-- 保留用户已有修改和无关的未跟踪文件。
-- 较大修改前后都要检查 `git status --short`。
-- 除非用户明确要求，否则不得使用破坏性 Git 命令或重写历史。
-- 除非用户明确要求，否则不得提交、推送、合并、变基或创建 Pull Request。
-- 修改范围聚焦当前请求和当前迁移阶段，不顺手重写无关模块。
-- 对源码和文档进行明确修改时使用 `apply_patch`。
-- 生成的日志、PID、上传文件、数据库、覆盖率输出、Checkpoint 和本地环境文件必须保持未跟踪状态。
+```text
+Oncall_agent/
+├── app/
+│   ├── main.py                    FastAPI 入口、lifespan、路由和静态文件
+│   ├── config.py                  唯一集中配置入口（Pydantic Settings）
+│   ├── api/                       HTTP/SSE 边界与兼容适配
+│   ├── models/                    公共 API 请求、响应与事件模型
+│   ├── agent/
+│   │   ├── graph.py               顶层 Supervisor-Specialist LangGraph
+│   │   ├── state.py               顶层 TypedDict 状态和 Reducer 语义
+│   │   ├── contracts.py           AgentTask/Result/Evidence/Route/Review 等契约
+│   │   ├── final_response.py      最终自然语言回答生成
+│   │   ├── supervisor/            Supervisor 路由策略、Prompt、Schema
+│   │   ├── specialists/
+│   │   │   ├── knowledge/         Milvus 检索、证据标准化、有依据回答
+│   │   │   ├── data/              只读工具规划、调用、脱敏、动态证据
+│   │   │   ├── task/              Plan-Execute-Replan 子图及步骤委派
+│   │   │   └── reviewer/          确定性检查 + 结构化 LLM 复核
+│   │   ├── memory/                跨轮工作记忆契约、上下文、Reducer、TTL、压缩
+│   │   ├── runtime/               Checkpointer 工厂和运行硬限制
+│   │   ├── mcp_client.py          MCP 客户端、重试、错误清洗与降级
+│   │   └── aiops/                 旧导入路径兼容层
+│   ├── services/
+│   │   ├── multi_agent_service.py 统一执行、SSE、公开模型、持久化与工作记忆协调
+│   │   ├── event_service.py       安全事件信封、大小限制与脱敏
+│   │   ├── persistence.py         同一 lifespan 下组装持久化资源
+│   │   ├── run_store.py           Memory/SQLite/PostgreSQL RunStore
+│   │   ├── working_memory_store.py PostgreSQL 工作记忆存储
+│   │   ├── aiops_service.py       旧 AIOps 请求到 Task Agent 的适配
+│   │   ├── rag_agent_service.py   旧 RAG Agent 实现，兼容期保留
+│   │   └── vector_*.py            切分、Embedding、索引、存储和检索服务
+│   ├── tools/
+│   │   ├── registry.py            中央工具注册表和 Agent 级白名单
+│   │   ├── mcp_provider.py        MCP 工具发现、缓存、来源与健康状态
+│   │   ├── knowledge_tool.py      知识库检索工具
+│   │   ├── query_metrics_alerts.py 本地只读告警查询工具
+│   │   └── time_tool.py           本地时间工具
+│   ├── core/                      LLM Factory 与 Milvus 客户端
+│   ├── evaluation/runner.py       离线 Eval 执行与基线比较
+│   └── cli/                       数据库升级与 SQLite RunStore 迁移命令
+├── tests/
+│   ├── unit/                      契约、路由、Agent、工具、记忆等纯单元测试
+│   ├── integration/               图协作、降级、持久化和隔离测试
+│   ├── contract/                  JSON、SSE、前端和旧接口兼容测试
+│   ├── evals/                     固定数据集与离线评估
+│   └── fakes/                     外部边界的测试替身
+├── mcp_servers/                   CLS、Monitor、Ticket 三个本地 MCP 示例服务
+├── migrations/                    Alembic 业务表迁移
+├── static/                        原生 HTML/CSS/JS 前端
+├── business-docs/                 产品、规则、FAQ、交付知识库样例
+├── aiops-docs/                    运维故障知识库样例
+├── xzh_docs/
+│   ├── architecture/              当前架构与执行时序
+│   ├── plan_docs/                 路线图和实施计划，可能包含未实现能力
+│   ├── handoff_docs/              所有任务交接文档的唯一目录
+│   ├── eval_reports/              已生成并提交的评估报告
+│   └── appendices/、labs/ 等      教程、参考和实验文档
+├── Makefile                       本地开发、测试、服务和数据库命令
+├── pyproject.toml                 Python 版本、依赖、测试和格式规则
+├── vector-database.yml            Milvus Docker Compose
+└── postgres-database.yml          PostgreSQL Docker Compose
+```
 
-## 完成检查清单
+## 5. 核心文件如何协作
 
-报告任务完成前，根据本次修改核对以下适用项：
+### 5.1 顶层编排
 
-- 实现遵守 Agent 边界和工具权限。
-- 图具有有限重试和明确终止路径。
-- 状态更新使用了符合预期的 Reducer 语义。
-- API 与 SSE 保持兼容，或已经明确完成迁移。
-- 错误和部分成功状态被真实表达。
-- 测试覆盖本次行为变化，并运行了所有可行检查。
-- 文档只描述已经实现的行为。
-- 没有新增密钥或生成态运行文件。
-- `git status --short` 中只包含预期修改和用户已有工作。
+`app/agent/graph.py` 的固定节点是：
+
+```text
+START -> supervisor
+  direct ---------------------------> aggregate
+  single/parallel/complex -> specialist(s) -> aggregate
+aggregate -> fast path -> final_response -> END
+aggregate -> reviewer
+reviewer -> final_response -> END
+reviewer -> prepare_retry -> supervisor   （受限返工）
+```
+
+关键不变量：
+
+- Supervisor 只能路由到 `knowledge`、`data`、`task`。
+- `RouteDecision` 在 `app/agent/contracts.py` 校验路由形状；不得执行模型任意生成的名称。
+- `parallel` 只能包含不同的 Knowledge/Data 只读任务；`complex` 只能进入 Task Agent。
+- Specialist 并行结果通过 `operator.add` Reducer 追加；路由和候选答案按节点覆盖。
+- 每个 run 的 checkpoint thread key 为 `thread_id:run_id`，避免同一业务线程内不同运行互相污染。
+- 所有路径必须进入 `completed`、`partial` 或 `failed`，并带 `termination_reason`。
+- Supervisor 轮次、Reviewer 返工、Task 步骤、图递归、Agent 超时、工具超时和重试均有硬限制。
+
+### 5.2 Agent 权限边界
+
+| Agent | 职责 | 可用能力 | 不应持有 |
+|---|---|---|---|
+| Supervisor | 路由、任务拆分、返工决策 | 结构化 LLM 路由、已有结果与记忆视图 | Milvus、MCP、底层业务工具 |
+| Knowledge | 内部知识问答 | Milvus Retriever、静态证据 | Data/MCP 工具 |
+| Data | 当前数据查询 | Registry 分配的只读本地/MCP 工具 | Knowledge Retriever、写入工具 |
+| Task | 有依赖的多步骤任务 | Planner、Executor、Replanner；逐步委派 Knowledge/Data | 无界循环、无约束并行 |
+| Reviewer | 完整性、证据和错误披露检查 | 原请求、候选答案、已有证据和错误 | 底层工具、新证据生成 |
+
+一个新增模块只有同时具备独立目标、自己的指令策略、明确权限、结构化输入输出和独立行为测试，
+才能命名为 Agent。普通函数、服务、工具和 LangGraph 节点不要命名为 Agent。
+
+### 5.3 公共契约
+
+- Agent 间契约：`app/agent/contracts.py`。
+- 顶层图状态：`app/agent/state.py`；Task 子图状态：`app/agent/specialists/task/state.py`。
+- 公共 API/SSE 契约：`app/models/agent.py`。
+- 工作记忆契约：`app/agent/memory/contracts.py`。
+- API 与 Agent 边界使用 Pydantic；LangGraph 状态使用 `TypedDict`。
+- Pydantic 可变默认值必须使用 `Field(default_factory=...)`。
+- 原始模型响应、原始 MCP 返回和内部状态不得直接进入公共 API。
+
+### 5.4 持久化的三个概念
+
+不要混淆：
+
+1. **LangGraph Checkpointer**：保存图执行状态，由 `runtime/checkpointer.py` 创建。
+2. **RunStore**：保存公开的 run、event、trace、metrics 和线程历史。
+3. **WorkingMemoryStore**：保存每个业务 `thread_id` 的结构化跨轮上下文快照。
+
+`PersistenceFactory` 确保前两者选择同一后端。当前后端语义：
+
+| 后端 | Checkpoint | Run/Trace | Working Memory | 用途 |
+|---|---|---|---|---|
+| `memory` | 进程内 | 进程内 | 无 | 单元测试、短期开发 |
+| `sqlite` | 本地文件 | 同一本地文件 | 无 | 单机本地回退 |
+| `postgres` | PostgreSQL | PostgreSQL | 可启用 | 默认共享持久化 |
+
+PostgreSQL Schema 由两部分组成：Alembic 管理 `agent_runs`、`agent_events`、
+`agent_working_memories`；LangGraph saver 自己初始化 checkpoint 表。统一使用
+`python -m app.cli.database upgrade` 或 `make db-upgrade`。
+
+## 6. API 与前端契约
+
+统一接口位于 `app/api/agent.py`：
+
+| 方法与路径 | 作用 |
+|---|---|
+| `POST /api/agent/run` | 同步执行，返回 `AgentRunResponse` |
+| `POST /api/agent/run_stream` | SSE 执行，返回统一事件信封 |
+| `GET /api/agent/runs/{run_id}` | 查询公开运行结果 |
+| `GET /api/agent/runs/{run_id}/trace` | 查询事件和指标 |
+| `GET /api/agent/metrics` | 查询聚合运行指标 |
+| `GET /api/agent/threads/{thread_id}` | 查询公开线程历史 |
+| `DELETE /api/agent/threads/{thread_id}` | 删除该线程的 Run、Checkpoint 和工作记忆 |
+
+兼容接口：
+
+- `POST /api/chat`、`POST /api/chat_stream`、`POST /api/chat/clear`、
+  `GET /api/chat/session/{session_id}` 适配到统一 Multi-Agent 服务。
+- `POST /api/aiops` 已标记 deprecated，通过 `AIOpsService` 适配 Task Agent。
+- `/api/upload` 与 `/api/index_directory` 负责知识库写入。
+
+修改 API 或 SSE 时必须：
+
+- 先更新 Pydantic 模型，再更新服务与路由。
+- 统一事件至少保留 `event_id`、`run_id`、`thread_id`、`type`、`timestamp` 和 `data`。
+- 每个 SSE 流只发送一个终态事件：`run_completed` 或 `run_failed`。
+- 同一次修改更新 `static/app.js`、API 文档和新旧接口契约测试。
+- 不向浏览器暴露 Prompt、隐藏推理、凭据、Authorization Header、原始异常栈或无限制工具结果。
+
+## 7. 常见修改应从哪里开始
+
+| 修改目标 | 首要文件 | 同时检查 |
+|---|---|---|
+| 路由策略或并行规则 | `agent/supervisor/agent.py`、`agent/contracts.py` | `agent/graph.py`、Supervisor/图测试 |
+| 顶层节点或循环 | `agent/graph.py`、`agent/state.py` | `runtime/limits.py`、集成测试 |
+| 知识检索与引用 | `specialists/knowledge/` | `knowledge_tool.py`、vector 服务、固定 Eval |
+| MCP/Data 工具 | `tools/registry.py`、`tools/mcp_provider.py`、`specialists/data/` | MCP 降级、脱敏、重名和权限测试 |
+| 复杂任务执行 | `specialists/task/` | `aiops_service.py`、Task 集成测试 |
+| Reviewer 规则 | `specialists/reviewer/` | 顶层返工路径、Reviewer 单元测试 |
+| 工作记忆 | `agent/memory/`、`working_memory_store.py` | `multi_agent_service.py`、迁移、记忆测试 |
+| JSON/SSE 协议 | `models/agent.py`、`api/agent.py`、`event_service.py` | `static/app.js`、contract 测试 |
+| 持久化后端 | `persistence.py`、`run_store.py`、`runtime/checkpointer.py` | CLI、migrations、持久化测试 |
+| LLM 模型选择 | `core/llm_factory.py` | `config.py`，不要在节点中直接实例化 |
+| 文档上传与检索 | `api/file.py`、`services/vector_*` | Milvus、文件安全、RAG 回归 |
+
+修改前推荐阅读顺序：
+
+1. `app/main.py`
+2. `app/api/agent.py` 与 `app/models/agent.py`
+3. `app/services/multi_agent_service.py`
+4. `app/agent/contracts.py`、`state.py`、`graph.py`
+5. 对应的 Supervisor 或 Specialist
+6. 对应测试
+7. `xzh_docs/architecture/` 中的当前架构说明
+
+`xzh_docs/plan_docs/multi-agent-refactor-plan.md` 是路线图；其中目标结构和未来能力可能已过期或尚未
+实现。交接当前进行中的工作时，再查看 `xzh_docs/handoff_docs/` 中日期最新且主题匹配的文档。
+
+## 8. 开发规范
+
+- Python 支持版本以 `pyproject.toml` 为准：当前为 3.11 至 3.13。
+- 遵循 Black/Ruff 配置，行宽 100；新增公共函数和模型必须有类型标注。
+- LLM、MCP、网络和图执行路径优先使用 `async def`，不得用同步网络请求阻塞事件循环。
+- 复用 `app/core/llm_factory.py`；模型实例、模型名、URL、超时和凭据均从 `app/config.py` 获取。
+- 避免 import 阶段的网络连接和昂贵初始化，使用 FastAPI lifespan 或显式延迟初始化。
+- 使用 Loguru。适用时记录 `run_id`、`thread_id`、Agent、节点/工具、耗时和状态。
+- 正常流程保持直接清晰；只在 LLM、MCP、Milvus、网络、文件和数据库等真实系统边界捕获异常。
+- 只有能恢复时才捕获异常；失败必须通过日志、结构化错误或终态保持可见。
+- 不添加宽泛静默 `except`、伪成功、无意义包装层或只为“以后可能复用”的抽象。
+- 规则明确时优先确定性代码；语义判断才交给结构化输出的 LLM。
+
+## 9. RAG、工具与记忆约束
+
+- 上传、切分、索引、检索、AgentResult 和最终引用必须保留来源元数据。
+- Knowledge Agent 有检索结果时必须返回 Evidence；证据不足要明确说明。
+- 检索失败与检索为空是不同状态，不得合并成静默空结果。
+- 修改 Chunk、Top-K、相关性阈值、查询改写、Rerank 或引用规则时，运行固定数据集回归。
+- 工具统一经 Registry/Provider 管理并按 Agent 白名单分配；检测重名并保留 MCP Server 来源。
+- 工具默认只读。新增写入或破坏性工具必须设计显式授权和 Human-in-the-Loop 审批节点。
+- MCP 发现结果按配置缓存，不得在每个图节点重复发现全部工具。
+- 文档、MCP 响应和工具输出全部视为不可信输入，进入模型和 API 前做长度限制和脱敏。
+- 动态证据必须包含带时区的 `observed_at`，由服务端策略设置 `valid_until`；过期事实必须重查。
+- 工作记忆只能保存公开请求、受支持证据、错误摘要和业务状态；禁止保存隐藏思维链。
+
+## 10. 测试与验证
+
+测试不得默认依赖真实 DashScope Key、真实 Milvus 或在线 MCP。使用 Fake 或依赖注入隔离外部边界。
+`tests/conftest.py` 会禁止测试读取开发者本地 `.env`。
+
+测试分层：
+
+- `tests/unit/`：契约、Reducer、路由、权限、证据、脱敏、限制和 Agent 行为。
+- `tests/integration/`：Specialist 协作、部分失败、MCP 降级、Checkpoint 隔离和持久化。
+- `tests/contract/`：统一 JSON/SSE、前端消费和旧 API 兼容。
+- `tests/evals/`：固定请求集上的路由、证据、工具选择和 Reviewer 行为。
+- PostgreSQL 实例测试带 `postgres` marker，需要独立测试数据库。
+
+常用命令：
+
+```bash
+make test-quick   # 当前仍运行整个 tests/，输出比 make test 简略
+make test         # 全部 pytest，并显式生成覆盖率报告
+make lint         # Ruff 检查 app/ 与 tests/
+make type-check   # 当前只运行 mypy app/
+make security     # Bandit 检查 app/
+make eval         # 固定离线评估
+make check-all    # 依次执行 format、lint、test；format 会修改 app/ 源码
+```
+
+开发时先运行最小相关测试；行为变更必须补相应测试。较大修改完成前运行所有可行检查，并报告实际
+运行项、结果和环境限制。需要只读验证时，不要直接使用会改写源码的 `make format` 或
+`make check-all`。仅文档修改可做针对性的内容与 diff 校验，无需为此运行完整应用测试。
+
+## 11. 数据库与本地运行
+
+常用入口：
+
+```bash
+make install-dev
+make postgres-up
+make db-upgrade
+make up            # Milvus
+make start         # MCP + FastAPI 后台服务
+make dev           # 前台热重载
+make stop
+```
+
+配置示例只从 `.env.example` 读取。不得读取、打印、复制、总结或提交真实 `.env`。
+默认 PostgreSQL 配置需要有效 `DATABASE_URL`；不得在代码中硬编码部署凭据。
+
+## 12. 安全、Git 与生成文件
+
+- 禁止提交 API Key、Token、Cookie、账号凭据、私有端点和用户数据。
+- 如果受 Git 跟踪的内容或命令输出出现凭据，停止传播并提示用户轮换。
+- 上传入口必须校验文件名、大小、扩展名和解析后的真实路径。
+- 不记录完整文档、无限制工具输出、凭据或个人数据。
+- 保留 `.gitignore` 对 `.env`、日志、PID、上传文件、数据库、覆盖率、数据集、Artifacts 和
+  Checkpoint 的忽略规则。
+- 源码和文档的明确修改使用 `apply_patch`。
+- 不使用 `git reset --hard`、`git checkout --` 等破坏性命令，不重写历史。
+- 较大修改前后都检查 `git status --short`，最终状态只能包含本任务修改和用户已有工作。
+
+## 13. 文档真实性与交接
+
+- 所有任务交接文档只放在 `xzh_docs/handoff_docs/`；不要散落到仓库根目录或其他文档目录。
+- 重要契约、依赖方向或运行方式变化时，同步更新 `xzh_docs/architecture/`、README 和 API 文档。
+- README 中的命令和接口必须与当前实现一致。
+- 计划能力必须标记为“计划中”；已实现能力必须能对应到源码、测试或可复现演示。
+- 不得虚构准确率、召回率、Groundedness、延迟、并发量或成本数据。
+- 简历与项目介绍中的每项能力都应能指向已提交代码、测试、数据集或评估结果。
+
+## 14. 完成前检查
+
+按本次任务适用范围确认：
+
+- 修改遵守 Agent 职责和工具权限边界。
+- 图和工具仍有硬限制，所有路径具有明确终态。
+- Reducer 的追加/覆盖语义正确，并发 run 和 thread 仍隔离。
+- 错误、证据不足与部分成功被真实表达。
+- API/SSE 与前端、旧兼容接口同步。
+- 持久化 Schema、服务生命周期和删除语义保持一致。
+- 测试覆盖行为变化，已运行足够的验证。
+- 文档只描述当前实现，没有新增密钥或生成态文件。
+- `git diff -- AGENTS.md` 和 `git status --short` 符合预期。

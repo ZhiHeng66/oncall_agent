@@ -21,6 +21,7 @@ knowledge 只查询内部文档；data 只查询只读外部数据；task 执行
             """用户请求：{user_query}
 已有 Agent 结果：{previous_results}
 审核反馈：{review_feedback}
+案件工作上下文（仅作辅助，动态事实过期时必须重新查询）：{memory_context}
 当前调度轮次：{round_number}""",
         ),
     ]

@@ -2,10 +2,13 @@ import json
 from collections.abc import AsyncGenerator
 from importlib import import_module
 from typing import Any
+from uuid import UUID
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from app.auth.contracts import CurrentUser
+from app.auth.dependencies import get_current_user
 from app.models.agent import (
     AgentRunResponse,
     AgentThreadDeleteResponse,
@@ -21,7 +24,7 @@ class FakeMultiAgentService:
     def __init__(self) -> None:
         self.events = AgentEventService()
 
-    async def run(self, request) -> AgentRunResponse:
+    async def run(self, request, owner_user_id) -> AgentRunResponse:
         return AgentRunResponse(
             run_id="run-json",
             thread_id=request.thread_id,
@@ -30,7 +33,7 @@ class FakeMultiAgentService:
             termination_reason="fast_path",
         )
 
-    async def stream(self, request):
+    async def stream(self, request, owner_user_id):
         yield self.events.create(
             run_id="run-stream",
             thread_id=request.thread_id,
@@ -52,10 +55,10 @@ class FakeMultiAgentService:
             },
         )
 
-    async def clear_thread(self, thread_id: str) -> AgentThreadDeleteResponse:
+    async def clear_thread(self, thread_id: str, owner_user_id) -> AgentThreadDeleteResponse:
         return AgentThreadDeleteResponse(thread_id=thread_id, deleted_runs=1)
 
-    async def get_thread(self, thread_id: str) -> AgentThreadResponse:
+    async def get_thread(self, thread_id: str, owner_user_id) -> AgentThreadResponse:
         return AgentThreadResponse(thread_id=thread_id)
 
 
@@ -81,6 +84,11 @@ def build_client(monkeypatch: Any) -> TestClient:
     app = FastAPI()
     app.include_router(chat_api.router, prefix="/api")
     app.include_router(aiops_api.router, prefix="/api")
+    app.dependency_overrides[get_current_user] = lambda: CurrentUser(
+        user_id=UUID("00000000-0000-0000-0000-000000000011"),
+        username="test-user",
+        role="user",
+    )
     return TestClient(app)
 
 

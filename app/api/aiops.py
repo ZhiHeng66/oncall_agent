@@ -3,12 +3,15 @@ AIOps 智能运维接口
 """
 
 import json
+from typing import Annotated
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from loguru import logger
 from sse_starlette.sse import EventSourceResponse
 
 from app.agent.mcp_client import sanitize_error_message
+from app.auth.contracts import CurrentUser
+from app.auth.dependencies import get_current_user
 from app.models.aiops import AIOpsRequest
 from app.services.aiops_service import aiops_service
 
@@ -16,7 +19,9 @@ router = APIRouter()
 
 
 @router.post("/aiops", deprecated=True)
-async def diagnose_stream(request: AIOpsRequest):
+async def diagnose_stream(
+    request: AIOpsRequest, current_user: Annotated[CurrentUser, Depends(get_current_user)]
+):
     """
     AIOps 故障诊断接口（流式 SSE）
 
@@ -123,7 +128,7 @@ async def diagnose_stream(request: AIOpsRequest):
     Returns:
         SSE 事件流
     """
-    session_id = request.session_id or "default"
+    session_id = f"{current_user.user_id}:{request.session_id or 'default'}"
     logger.info(f"[会话 {session_id}] 收到 AIOps 诊断请求（流式）")
 
     async def event_generator():

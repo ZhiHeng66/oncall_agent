@@ -4,7 +4,7 @@
 >
 > 文档日期：2026-09-13
 >
-> 文档状态：实施中；阶段一已于 2026-09-13 完成并通过验收，阶段二至四计划中
+> 文档状态：已完成；阶段一至四已于 2026-09-13 完成并通过验收
 >
 > 适用分支：`multi-agents`
 >
@@ -607,6 +607,9 @@ API 文档。
 
 ### 阶段二：跨重启加载、最近对话与角色化上下文
 
+> 实施状态：已完成。实际实现边界和验证结果见
+> `xzh_docs/handoff_docs/2026-09-13-postgres-working-memory-phase2-handoff.md`。
+
 #### 实施内容
 
 1. 为 RunStore 增加有界 `get_recent_thread()` 查询。
@@ -643,6 +646,9 @@ API 文档。
 
 ### 阶段三：每轮更新、确定性归并与 PostgreSQL 一致性
 
+> 实施状态：已完成。实际实现边界和验证结果见
+> `xzh_docs/handoff_docs/2026-09-13-postgres-working-memory-phase3-handoff.md`。
+
 #### 实施内容
 
 1. 实现纯逻辑 Working Memory Reducer。
@@ -650,7 +656,7 @@ API 文档。
    `WorkingMemoryUpdate`。
 3. 实现事实引用校验、用户声明降级、语义去重、supersede/resolve 和数量裁剪。
 4. 抽取 JSON/SSE 共用的运行完成流程。
-5. 在 PostgreSQL 完成事务中保存 run、events 和有效记忆更新。
+5. 先保存公开 run/events，再执行有效记忆的 CAS 写入；记忆失败不得改变主回答或覆盖旧快照。
 6. 实现 CAS 冲突后的重新加载、重新归并和一次有界重试。
 7. 没有可更新材料时不创建空记忆、不增加版本。
 8. 扩展 `clear_thread()`，清理工作记忆并真实表达部分删除失败。
@@ -679,6 +685,9 @@ API 文档。
 - 服务重启后读取的是最后一个已提交版本。
 
 ### 阶段四：受约束 LLM 压缩、质量控制与文档
+
+> 实施状态：已完成。实际实现边界和验证结果见
+> `xzh_docs/handoff_docs/2026-09-13-postgres-working-memory-phase4-handoff.md`。
 
 #### 实施内容
 

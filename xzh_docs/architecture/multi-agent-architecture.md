@@ -2,6 +2,12 @@
 
 本文只描述当前代码已经实现的能力。SQLite 是本地单实例持久化方案，不宣称生产级高可用。
 
+启用 `AUTH_ENABLED=true` 后，系统使用 PostgreSQL `users` 表、Argon2 密码哈希和 Bearer JWT
+提供 `/api/auth/token`、`/api/auth/me` 及管理员用户 CLI。业务 API 从认证用户取得身份；Thread、
+Run、Trace、Checkpoint 和工作记忆均按用户所有权过滤，越权访问返回 404。静态前端只在
+`sessionStorage` 保存访问令牌，并从个人 Thread API 加载会话摘要和历史。该实现是单租户多用户的
+个人会话隔离，不是多租户或生产级 IAM。
+
 ```mermaid
 flowchart LR
     UI[Web / API Client] --> API[FastAPI Agent API]
@@ -28,4 +34,3 @@ Supervisor 轮次、Reviewer 返工次数和图递归，所有路径结束为 `c
 运行记录表保存公开响应、安全事件和耗时统计。LangGraph 自身的 Checkpoint 与公共运行索引
 共用数据库文件但使用独立表。隐藏思维链、密钥、Authorization Header 和未限制的工具原始
 返回值不进入公共 trace。
-

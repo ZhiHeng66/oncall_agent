@@ -11,6 +11,7 @@ from app.agent.contracts import (
     RouteDecision,
     RunStatus,
 )
+from app.agent.memory.contracts import MemoryContextView, MemoryUsage, WorkingMemoryContext
 
 
 class MultiAgentState(TypedDict):
@@ -18,6 +19,9 @@ class MultiAgentState(TypedDict):
     thread_id: str
     run_id: str
     user_query: str
+    working_memory: WorkingMemoryContext | None
+    memory_view: MemoryContextView
+    memory_usage: MemoryUsage
     route_decision: RouteDecision | None
     pending_tasks: list[AgentTask]
     dispatch_task: AgentTask | None

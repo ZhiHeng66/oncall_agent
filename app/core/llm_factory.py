@@ -8,7 +8,7 @@ from langchain_qwq import ChatQwen
 
 from app.config import Settings, config
 
-LLMRole = Literal["chat", "supervisor", "specialist", "task", "reviewer", "finalizer"]
+LLMRole = Literal["chat", "supervisor", "specialist", "task", "reviewer", "finalizer", "memory"]
 
 
 class LLMFactory:
@@ -67,8 +67,14 @@ class LLMFactory:
                 self._settings.agent_temperature,
                 True,
             ),
+            "memory": (
+                self._settings.reviewer_model,
+                self._settings.agent_temperature,
+                False,
+            ),
         }
         default_model, default_temperature, default_streaming = profiles[role]
+        overrides.setdefault("enable_thinking", self._settings.llm_enable_thinking)
         return self._model_builder(
             model=model or default_model,
             api_key=api_key or self._settings.dashscope_api_key,

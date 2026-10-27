@@ -43,7 +43,7 @@ class SequenceSupervisor:
         self.decisions = decisions
         self.calls = 0
 
-    async def route(self, user_query, previous_results, review, round_number):
+    async def route(self, user_query, previous_results, review, round_number, memory_context=""):
         selected = self.decisions[min(self.calls, len(self.decisions) - 1)]
         self.calls += 1
         return selected
@@ -73,16 +73,22 @@ class FakeAgent:
 
 
 class FakeTaskAgent(FakeAgent):
-    async def run(self, task: AgentTask, thread_id: str | None = None) -> AgentResult:
+    async def run(
+        self, task: AgentTask, thread_id: str | None = None, run_id: str | None = None
+    ) -> AgentResult:
         return await super().run(task)
 
-    async def stream(self, task: AgentTask, thread_id: str | None = None):
+    async def stream(
+        self, task: AgentTask, thread_id: str | None = None, run_id: str | None = None
+    ):
         result = await self.run(task, thread_id=thread_id)
         yield {"type": "run_completed", "result": result.model_dump(mode="json")}
 
 
 class TimelineTaskAgent(FakeTaskAgent):
-    async def stream(self, task: AgentTask, thread_id: str | None = None):
+    async def stream(
+        self, task: AgentTask, thread_id: str | None = None, run_id: str | None = None
+    ):
         yield {"type": "plan_created", "plan": ["collect"]}
         yield {"type": "step_started", "step": "collect", "step_index": 1}
         yield {
@@ -105,7 +111,7 @@ class NoopReviewer:
     def __init__(self) -> None:
         self.calls = 0
 
-    async def review(self, user_query, candidate_answer, evidence, errors):
+    async def review(self, user_query, candidate_answer, evidence, errors, memory_context=""):
         self.calls += 1
         return ReviewResult(
             passed=True,
@@ -119,7 +125,7 @@ class SequenceReviewer:
         self.results = results
         self.calls = 0
 
-    async def review(self, user_query, candidate_answer, evidence, errors):
+    async def review(self, user_query, candidate_answer, evidence, errors, memory_context=""):
         result = self.results[min(self.calls, len(self.results) - 1)]
         self.calls += 1
         return result
@@ -158,7 +164,7 @@ class SlowAgent(FakeAgent):
 
 
 class RaisingSupervisor:
-    async def route(self, user_query, previous_results, review, round_number):
+    async def route(self, user_query, previous_results, review, round_number, memory_context=""):
         raise RuntimeError("Authorization: Bearer private-supervisor-token")
 
 

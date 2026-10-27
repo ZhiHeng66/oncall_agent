@@ -14,7 +14,7 @@
 - **Task Agent**：使用有限 Plan-Execute-Replan 子图执行有依赖的复杂任务。
 - **Reviewer Agent**：检查证据、引用和错误披露，最多定向返工一次。
 - **统一 API 与 SSE**：提供 JSON 响应、Agent 时间线、来源和明确终态。
-- **可插拔持久化与追踪**：SQLite 支持本地单实例恢复；PostgreSQL 可选后端支持多个应用实例共享顶层 Checkpoint、运行记录和安全 Trace。
+- **PostgreSQL 持久化与工作记忆**：默认启动 PostgreSQL，保存顶层 Checkpoint、运行记录、安全 Trace 和按 `thread_id` 的案件工作记忆。
 - **固定离线 Eval**：34 条用例覆盖路由、检索引用契约、工具计划校验、任务终态和 Reviewer；`make eval` 可重复生成同数据集比较报告。
 - **业务演示数据**：产品手册、业务规则、FAQ、交付指南，以及只读工单 MCP 数据源。
 - **兼容接口**：迁移期保留 `/api/chat`、`/api/chat_stream` 和 `/api/aiops`。
@@ -24,7 +24,7 @@
 - **框架**: FastAPI + LangChain + LangGraph
 - **LLM**: 阿里云 DashScope (通义千问)
 - **向量库**: Milvus
-- **持久化**: SQLite（默认本地）/ PostgreSQL（可选共享后端）
+- **持久化**: PostgreSQL（默认）/ SQLite、memory（显式本地回退）
 - **工具协议**: MCP (Model Context Protocol)
 
 ## 🚀 快速开始
@@ -52,11 +52,11 @@ uv pip install -e .
 # 方式 2: 使用 pip
 pip install -e .
 
-# 3. 编辑配置文件
-# 首次使用需要编辑 .env 文件，填入你的 DASHSCOPE_API_KEY
+# 3. 创建并编辑配置文件：填入 DASHSCOPE_API_KEY，并为 PostgreSQL 设置强密码
+cp .env.example .env
 vim .env  # 或使用其他编辑器
 
-# 4. 一键初始化（启动 Docker + 服务 + 上传文档）
+# 4. 一键初始化（启动 Milvus + PostgreSQL、初始化 Schema、启动服务、上传文档）
 make init
 
 # 5. 一键启动
@@ -88,7 +88,8 @@ python -m venv .venv
 pip install -e .
 
 # 3. 编辑配置文件
-# 使用记事本或其他编辑器打开 .env 文件，填入你的 DASHSCOPE_API_KEY
+# 从示例创建配置，再填入 DASHSCOPE_API_KEY 和 POSTGRES_PASSWORD
+copy .env.example .env
 notepad .env
 
 # 4. 启动 Docker Desktop
@@ -97,10 +98,14 @@ notepad .env
 # 5. 启动 Milvus 向量数据库（Docker Compose）
 docker compose -f vector-database.yml up -d
 
-# 6. 等待 Milvus 启动完成（约 5-10 秒）
+# 6. 启动 PostgreSQL 并初始化 Schema
+docker compose -f postgres-database.yml up -d
+python -m app.cli.database upgrade
+
+# 7. 等待 Milvus 启动完成（约 5-10 秒）
 timeout /t 10
 
-# 7. 启动 MCP 服务
+# 8. 启动 MCP 服务
 # 启动 CLS 日志查询服务（新开一个 PowerShell 窗口）
 python mcp_servers/cls_server.py
 
@@ -110,11 +115,11 @@ python mcp_servers/monitor_server.py
 # 启动只读业务工单服务
 python mcp_servers/ticket_server.py
 
-# 8. 启动 FastAPI 主服务（新开一个 PowerShell 窗口）
+# 9. 启动 FastAPI 主服务（新开一个 PowerShell 窗口）
 # 注意：日志会自动输出到 logs\app_YYYY-MM-DD.log
 python -m uvicorn app.main:app --host 0.0.0.0 --port 9900
 
-# 9. 上传文档到向量库（新开一个 PowerShell 窗口）
+# 10. 上传文档到向量库（新开一个 PowerShell 窗口）
 # 等待服务启动完成后执行
 timeout /t 5
 # 可逐个将 business-docs/ 下的 Markdown 上传至 /api/upload
@@ -147,6 +152,7 @@ timeout /t 5
 | 查询运行 | GET | `/api/agent/runs/{run_id}` | 查询已完成运行 |
 | 查询 Trace | GET | `/api/agent/runs/{run_id}/trace` | 查询 Agent、工具事件与单次运行指标 |
 | 聚合指标 | GET | `/api/agent/metrics` | 失败率、超时率、平均耗时、调度/工具/步骤数 |
+| 列出个人线程 | GET | `/api/agent/threads` | 当前登录用户的线程摘要 |
 | 查询线程 | GET | `/api/agent/threads/{thread_id}` | 查询持久化运行和用户可见消息 |
 | 清理线程 | DELETE | `/api/agent/threads/{thread_id}` | 清理线程运行记录和图 Checkpoint |
 | 旧普通对话 | POST | `/api/chat` | 兼容适配到统一 Agent Service |
@@ -155,22 +161,34 @@ timeout /t 5
 | 文件上传 | POST | `/api/upload` | 上传并索引文档 |
 | 健康检查 | GET | `/health` | 服务状态检查 |
 
+除健康检查和登录入口外，上述业务接口均要求 Bearer Token；文件上传和目录索引还要求
+`admin` 角色。浏览器端只在 `sessionStorage` 保存短期访问令牌，会话列表和消息均由服务端
+按当前用户返回。
+
 ### 使用示例
 
 ```bash
-# 统一 JSON 接口
+# 登录（由管理员通过 CLI 创建本地账号）
+TOKEN=$(curl -s -X POST "http://localhost:9900/api/auth/token" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "username=alice&password=your-password" | jq -r .access_token)
+
+# 统一 JSON 接口；不传 user_id，thread_id 可省略以创建新线程
 curl -X POST "http://localhost:9900/api/agent/run" \
+  -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"user_id":"user-001","thread_id":"thread-001","message":"查询内部发布规范"}'
+  -d '{"message":"查询内部发布规范"}'
 
 # 统一 SSE 接口
 curl -X POST "http://localhost:9900/api/agent/run_stream" \
+  -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"user_id":"user-001","thread_id":"thread-001","message":"结合制度和当前数据给出分析"}' \
+  -d '{"message":"结合制度和当前数据给出分析"}' \
   --no-buffer
 
 # 旧 Chat 兼容接口
 curl -X POST "http://localhost:9900/api/chat" \
+  -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"Id":"thread-001","Question":"你好"}'
 
@@ -185,11 +203,12 @@ curl "http://localhost:9900/api/agent/metrics"
 和 `data`。每个流只产生一个 `run_completed` 或 `run_failed` 终态事件。浏览器断开后，
 服务会关闭对应异步事件生成器，不再继续向该客户端生成事件。
 
-默认使用 `data/multi_agent.sqlite3` 保存 Multi-Agent 顶层 LangGraph Checkpoint、运行索引和
-安全事件，适合本地演示与单实例重启恢复。将 `CHECKPOINTER_BACKEND` 设为 `postgres` 并完成
-Schema 初始化后，多个应用实例可以共享这两类状态。Task Agent 子图和旧 RAG 对话链路仍使用
-进程内 Checkpointer，因此这不等于所有兼容链路都已持久化。未获得可靠 provider usage 与
-计价信息时，模型调用数、Token 数和 Token 成本返回 `null`，不会伪装为 0。
+默认使用 PostgreSQL 保存 Multi-Agent 顶层 LangGraph Checkpoint、运行索引、安全事件和按
+`thread_id` 的案件工作记忆。`make init`、`make start`、`make dev` 与 `make run` 都会启动
+PostgreSQL 并执行幂等 Schema 升级；首次使用前必须从 `.env.example` 创建 `.env`，并替换
+`POSTGRES_PASSWORD` 与 `DATABASE_URL` 内的密码占位符。Task Agent 子图和旧 RAG 对话链路仍有
+各自的状态边界，因此这不等于所有兼容链路都已持久化。未获得可靠 provider usage 与计价信息时，
+模型调用数、Token 数和 Token 成本返回 `null`，不会伪装为 0。
 
 ## 📁 项目结构
 
@@ -294,30 +313,34 @@ RAG_TOP_K=3
 CHUNK_MAX_SIZE=800
 CHUNK_OVERLAP=100
 
-# 本地持久化（默认值）
-CHECKPOINTER_BACKEND=sqlite
-CHECKPOINT_PATH=data/multi_agent.sqlite3
+# PostgreSQL 持久化（默认）
+CHECKPOINTER_BACKEND=postgres
+DATABASE_URL=postgresql://oncall_agent:<password>@localhost:5432/oncall_agent
+POSTGRES_PASSWORD=<password>
+POSTGRES_POOL_MIN_SIZE=1
+POSTGRES_POOL_MAX_SIZE=10
 
-# PostgreSQL 共享持久化（可选）
-# CHECKPOINTER_BACKEND=postgres
-# DATABASE_URL=postgresql://oncall_agent:<password>@localhost:5432/oncall_agent
-# POSTGRES_POOL_MIN_SIZE=1
-# POSTGRES_POOL_MAX_SIZE=10
+# 仅在需要本地回退时显式切换：
+# CHECKPOINTER_BACKEND=sqlite
+# CHECKPOINT_PATH=data/multi_agent.sqlite3
 
 # 非运维业务 MCP 示例
 MCP_TICKET_URL=http://localhost:8005/mcp
 ```
 
-### PostgreSQL 共享持久化
+### PostgreSQL 默认持久化
 
-PostgreSQL 是可选后端，不影响默认 SQLite 启动。首次使用前设置 `.env` 中的
-`POSTGRES_PASSWORD`、`DATABASE_URL` 和 `CHECKPOINTER_BACKEND=postgres`，然后执行：
+PostgreSQL 是默认后端。首次使用前从 `.env.example` 创建 `.env`，设置
+`POSTGRES_PASSWORD`，并将相同密码写入 `DATABASE_URL`，然后执行：
 
 ```bash
-make postgres-up       # 启动独立 PostgreSQL 容器
-make db-upgrade        # 初始化业务表和 LangGraph Checkpoint 表
+make postgres-up       # 启动 PostgreSQL 容器
+make db-upgrade        # 初始化业务表、工作记忆表和 LangGraph Checkpoint 表
 make postgres-status
 ```
+
+`make init`、`make start`、`make dev` 与 `make run` 会执行上述 PostgreSQL 启动和幂等升级；
+无需单独运行它们。
 
 数据库不可达或 Schema 尚未初始化时，应用会明确启动失败，不会静默退回 SQLite。历史公开
 run、event 和 Trace 可在停止新写入并备份 SQLite 后迁移：
@@ -364,8 +387,8 @@ make sync              # 同步依赖
 # Docker 管理
 make up                # 启动 Docker 容器
 make down              # 停止 Docker 容器
-make postgres-up       # 启动可选 PostgreSQL
-make postgres-down     # 停止可选 PostgreSQL
+make postgres-up       # 启动默认 PostgreSQL
+make postgres-down     # 停止 PostgreSQL
 make db-upgrade        # 初始化/升级 PostgreSQL Schema
 
 # 代码质量

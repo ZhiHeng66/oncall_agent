@@ -4,6 +4,7 @@ import argparse
 import asyncio
 from dataclasses import dataclass
 from pathlib import Path
+from uuid import UUID
 
 import aiosqlite
 
@@ -11,6 +12,8 @@ from app.agent.runtime.checkpointer import create_postgres_pool
 from app.config import Settings
 from app.models.agent import AgentEventEnvelope, AgentRunMetrics, AgentRunResponse
 from app.services.run_store import PostgresRunStore, RunStore
+
+LEGACY_USER_ID = UUID("00000000-0000-0000-0000-000000000001")
 
 
 @dataclass(frozen=True)
@@ -41,7 +44,7 @@ async def migrate_sqlite_run_store(source_path: Path, target: RunStore) -> Migra
             response = AgentRunResponse.model_validate_json(raw_response)
             metrics = AgentRunMetrics.model_validate_json(raw_metrics)
             events = [AgentEventEnvelope.model_validate_json(row[0]) for row in event_rows]
-            await target.save(request_message, response, events, metrics)
+            await target.save(LEGACY_USER_ID, request_message, response, events, metrics)
             run_count += 1
             event_count += len(events)
     return MigrationSummary(runs=run_count, events=event_count)

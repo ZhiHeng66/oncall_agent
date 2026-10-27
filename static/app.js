@@ -45,10 +45,12 @@ class SuperBizAgentApp {
         this.sseParser = new SSEEventParser();
         // 两种模式只影响传输方式，业务路由统一由 Supervisor 决定。
         this.currentMode = 'stream'; // 'quick' 或 'stream'
-        this.sessionId = this.generateSessionId();
+        this.sessionId = null;
+        this.accessToken = sessionStorage.getItem('accessToken');
+        this.currentUser = null;
         this.isStreaming = false;
         this.currentChatHistory = []; // 当前对话的消息历史
-        this.chatHistories = this.loadChatHistories(); // 所有历史对话
+        this.chatHistories = []; // 服务端返回的当前用户会话摘要
         this.isCurrentChatFromHistory = false; // 标记当前对话是否是从历史记录加载的
         
         this.initializeElements();
@@ -56,7 +58,7 @@ class SuperBizAgentApp {
         this.updateUI();
         this.initMarkdown();
         this.checkAndSetCentered();
-        this.renderChatHistory();
+        this.bootstrapAuthentication();
     }
 
     // 初始化Markdown配置
@@ -158,6 +160,14 @@ class SuperBizAgentApp {
         this.chatContainer = document.querySelector('.chat-container');
         this.welcomeGreeting = document.getElementById('welcomeGreeting');
         this.chatHistoryList = document.getElementById('chatHistoryList');
+        this.loginScreen = document.getElementById('loginScreen');
+        this.appLayout = document.getElementById('appLayout');
+        this.loginForm = document.getElementById('loginForm');
+        this.loginError = document.getElementById('loginError');
+        this.loginUsername = document.getElementById('loginUsername');
+        this.loginPassword = document.getElementById('loginPassword');
+        this.currentUsername = document.getElementById('currentUsername');
+        this.logoutBtn = document.getElementById('logoutBtn');
         
         // 初始化时检查是否需要居中
         this.checkAndSetCentered();
@@ -245,6 +255,92 @@ class SuperBizAgentApp {
         if (this.fileInput) {
             this.fileInput.addEventListener('change', (e) => this.handleFileSelect(e));
         }
+        if (this.loginForm) this.loginForm.addEventListener('submit', (event) => this.login(event));
+        if (this.logoutBtn) this.logoutBtn.addEventListener('click', () => this.logout());
+    }
+
+    async bootstrapAuthentication() {
+        this.clearLegacyChatCache();
+        if (!this.accessToken) return this.showLogin();
+        try {
+            const response = await this.authorizedFetch(`${this.apiBaseUrl}/auth/me`);
+            if (!response.ok) throw new Error('登录已过期');
+            this.currentUser = await response.json();
+            await this.enterApplication();
+        } catch (_) {
+            this.logout();
+        }
+    }
+
+    async login(event) {
+        event.preventDefault();
+        this.loginError.textContent = '';
+        try {
+            const form = new URLSearchParams({
+                username: this.loginUsername.value,
+                password: this.loginPassword.value,
+            });
+            const response = await fetch(`${this.apiBaseUrl}/auth/token`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                body: form,
+            });
+            if (!response.ok) {
+                this.loginError.textContent = '用户名或密码不正确。';
+                return;
+            }
+            this.accessToken = (await response.json()).access_token;
+            sessionStorage.setItem('accessToken', this.accessToken);
+            this.currentUser = await (await this.authorizedFetch(`${this.apiBaseUrl}/auth/me`)).json();
+            await this.enterApplication();
+        } catch (error) {
+            console.error('登录失败:', error);
+            this.loginError.textContent = '无法连接登录服务，请稍后重试。';
+        }
+    }
+
+    async enterApplication() {
+        this.loginScreen.hidden = true;
+        this.appLayout.hidden = false;
+        this.currentUsername.textContent = this.currentUser.username;
+        this.sessionId = null;
+        this.currentChatHistory = [];
+        this.chatMessages.innerHTML = '';
+        await this.refreshThreads();
+        this.checkAndSetCentered();
+    }
+
+    logout() {
+        sessionStorage.removeItem('accessToken');
+        this.accessToken = null;
+        this.currentUser = null;
+        this.sessionId = null;
+        this.currentChatHistory = [];
+        this.chatHistories = [];
+        if (this.chatMessages) this.chatMessages.innerHTML = '';
+        if (this.chatHistoryList) this.chatHistoryList.innerHTML = '';
+        this.appLayout.hidden = true;
+        this.showLogin();
+    }
+
+    showLogin() {
+        this.loginScreen.hidden = false;
+        if (this.loginPassword) this.loginPassword.value = '';
+    }
+
+    clearLegacyChatCache() {
+        localStorage.removeItem('chatHistories');
+    }
+
+    async authorizedFetch(url, options = {}) {
+        const headers = new Headers(options.headers || {});
+        headers.set('Authorization', `Bearer ${this.accessToken}`);
+        const response = await fetch(url, {...options, headers});
+        if (response.status === 401) {
+            this.logout();
+            throw new Error('登录已失效，请重新登录。');
+        }
+        return response;
     }
 
     // 切换工具菜单显示/隐藏
@@ -306,7 +402,7 @@ class SuperBizAgentApp {
         }
         
         // 生成新的会话ID
-        this.sessionId = this.generateSessionId();
+        this.sessionId = null;
         
         // 新建会话后保持流式模式，避免悄然退回一次性响应。
         this.currentMode = 'stream';
@@ -326,93 +422,29 @@ class SuperBizAgentApp {
     
     // 保存当前对话到历史记录（新建）
     saveCurrentChat() {
-        if (this.currentChatHistory.length === 0) {
-            return;
-        }
-        
-        // 检查是否已存在相同ID的历史记录
-        const existingIndex = this.chatHistories.findIndex(h => h.id === this.sessionId);
-        if (existingIndex !== -1) {
-            // 如果已存在，更新而不是新建
-            this.updateCurrentChatHistory();
-            return;
-        }
-        
-        // 获取对话标题（使用第一条用户消息的前30个字符）
-        const firstUserMessage = this.currentChatHistory.find(msg => msg.type === 'user');
-        const title = firstUserMessage ? 
-            (firstUserMessage.content.substring(0, 30) + (firstUserMessage.content.length > 30 ? '...' : '')) : 
-            '新对话';
-        
-        const chatHistory = {
-            id: this.sessionId,
-            title: title,
-            messages: [...this.currentChatHistory],
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-        };
-        
-        // 添加到历史记录列表的开头
-        this.chatHistories.unshift(chatHistory);
-        
-        // 限制历史记录数量（最多保存50条）
-        if (this.chatHistories.length > 50) {
-            this.chatHistories = this.chatHistories.slice(0, 50);
-        }
-        
-        // 保存到localStorage
-        this.saveChatHistories();
+        // 服务端在运行完成后创建线程并维护摘要。
     }
     
     // 更新当前对话的历史记录
     updateCurrentChatHistory() {
-        if (this.currentChatHistory.length === 0) {
-            return;
-        }
-        
-        const existingIndex = this.chatHistories.findIndex(h => h.id === this.sessionId);
-        if (existingIndex === -1) {
-            // 如果不存在，调用保存方法
-            this.saveCurrentChat();
-            return;
-        }
-        
-        // 更新现有的历史记录
-        const history = this.chatHistories[existingIndex];
-        history.messages = [...this.currentChatHistory];
-        history.updatedAt = new Date().toISOString();
-        
-        // 如果标题需要更新（第一条消息改变了）
-        const firstUserMessage = this.currentChatHistory.find(msg => msg.type === 'user');
-        if (firstUserMessage) {
-            const newTitle = firstUserMessage.content.substring(0, 30) + (firstUserMessage.content.length > 30 ? '...' : '');
-            if (history.title !== newTitle) {
-                history.title = newTitle;
-            }
-        }
-        
-        // 保存到localStorage
-        this.saveChatHistories();
+        // 服务端为线程写入公开运行记录；浏览器只保持当前页面消息。
     }
     
     // 加载历史对话列表
     loadChatHistories() {
-        try {
-            const stored = localStorage.getItem('chatHistories');
-            return stored ? JSON.parse(stored) : [];
-        } catch (e) {
-            console.error('加载历史对话失败:', e);
-            return [];
-        }
+        return [];
     }
     
-    // 保存历史对话列表到localStorage
+    // 浏览器不持久化会话内容。
     saveChatHistories() {
-        try {
-            localStorage.setItem('chatHistories', JSON.stringify(this.chatHistories));
-        } catch (e) {
-            console.error('保存历史对话失败:', e);
-        }
+        // 会话内容只保存在服务端，浏览器不做持久化缓存。
+    }
+
+    async refreshThreads() {
+        const response = await this.authorizedFetch(`${this.apiBaseUrl}/agent/threads`);
+        if (!response.ok) throw new Error('加载会话列表失败');
+        this.chatHistories = await response.json();
+        this.renderChatHistory();
     }
     
     // 渲染历史对话列表
@@ -430,13 +462,13 @@ class SuperBizAgentApp {
         this.chatHistories.forEach((history, index) => {
             const historyItem = document.createElement('div');
             historyItem.className = 'history-item';
-            historyItem.dataset.historyId = history.id;
+            historyItem.dataset.historyId = history.thread_id;
             
             historyItem.innerHTML = `
                 <div class="history-item-content">
-                    <span class="history-item-title">${this.escapeHtml(history.title)}</span>
+                    <span class="history-item-title">${this.escapeHtml(history.title || '新对话')}</span>
                 </div>
-                <button class="history-item-delete" data-history-id="${history.id}" title="删除">
+                <button class="history-item-delete" data-history-id="${history.thread_id}" title="删除">
                     <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                     </svg>
@@ -446,7 +478,7 @@ class SuperBizAgentApp {
             // 点击历史项加载对话
             historyItem.addEventListener('click', (e) => {
                 if (!e.target.closest('.history-item-delete')) {
-                    this.loadChatHistory(history.id);
+                    this.loadChatHistory(history.thread_id);
                 }
             });
             
@@ -454,7 +486,7 @@ class SuperBizAgentApp {
             const deleteBtn = historyItem.querySelector('.history-item-delete');
             deleteBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                this.deleteChatHistory(history.id);
+                this.deleteChatHistory(history.thread_id);
             });
             
             this.chatHistoryList.appendChild(historyItem);
@@ -463,7 +495,7 @@ class SuperBizAgentApp {
     
     // 加载历史对话
     async loadChatHistory(historyId) {
-        const history = this.chatHistories.find(h => h.id === historyId);
+        const history = this.chatHistories.find(h => h.thread_id === historyId);
         if (!history) {
             return;
         }
@@ -481,13 +513,13 @@ class SuperBizAgentApp {
         
         try {
             // 从后端获取会话历史
-            const response = await fetch(`/api/chat/session/${historyId}`);
+            const response = await this.authorizedFetch(`${this.apiBaseUrl}/agent/threads/${historyId}`);
             if (response.ok) {
                 const data = await response.json();
                 const backendHistory = data.history || [];
                 
                 // 更新会话ID
-                this.sessionId = history.id;
+                this.sessionId = history.thread_id;
                 this.isCurrentChatFromHistory = true;
                 
                 // 清空并重新渲染消息
@@ -502,41 +534,14 @@ class SuperBizAgentApp {
                             const messageType = msg.role === 'user' ? 'user' : 'bot';
                             this.addMessage(messageType, msg.content, false, false);
                         });
-                    } else {
-                        // 否则使用localStorage的历史记录
-                        this.currentChatHistory = [...history.messages];
-                        history.messages.forEach(msg => {
-                            this.addMessage(msg.type, msg.content, false, false);
-                        });
                     }
                 }
             } else {
-                // 如果后端请求失败，使用localStorage的历史记录
-                console.warn('从后端加载历史失败，使用本地缓存');
-                this.sessionId = history.id;
-                this.currentChatHistory = [...history.messages];
-                this.isCurrentChatFromHistory = true;
-                
-                if (this.chatMessages) {
-                    this.chatMessages.innerHTML = '';
-                    history.messages.forEach(msg => {
-                        this.addMessage(msg.type, msg.content, false, false);
-                    });
-                }
+                throw new Error('无法加载服务器会话历史');
             }
         } catch (error) {
             console.error('加载会话历史失败:', error);
-            // 出错时使用localStorage的历史记录
-            this.sessionId = history.id;
-            this.currentChatHistory = [...history.messages];
-            this.isCurrentChatFromHistory = true;
-            
-            if (this.chatMessages) {
-                this.chatMessages.innerHTML = '';
-                history.messages.forEach(msg => {
-                    this.addMessage(msg.type, msg.content, false, false);
-                });
-            }
+            this.showNotification('加载会话失败: ' + error.message, 'error');
         }
         
         // 更新UI
@@ -548,42 +553,28 @@ class SuperBizAgentApp {
     async deleteChatHistory(historyId) {
         try {
             // 调用后端API清空会话
-            const response = await fetch('/api/chat/clear', {
-                method: 'POST',
+            const response = await this.authorizedFetch(`${this.apiBaseUrl}/agent/threads/${historyId}`, {
+                method: 'DELETE',
                 headers: {
                     'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    session_id: historyId
-                })
+                }
             });
 
             if (!response.ok) {
                 throw new Error('清空会话失败');
             }
 
-            const result = await response.json();
-            
-            if (result.status === 'success') {
-                // 从本地存储中删除
-                this.chatHistories = this.chatHistories.filter(h => h.id !== historyId);
-                this.saveChatHistories();
-                this.renderChatHistory();
-                
-                // 如果删除的是当前对话，清空当前对话
-                if (this.sessionId === historyId) {
-                    this.currentChatHistory = [];
-                    if (this.chatMessages) {
-                        this.chatMessages.innerHTML = '';
-                    }
-                    this.sessionId = this.generateSessionId();
-                    this.checkAndSetCentered();
+            this.chatHistories = this.chatHistories.filter(h => h.thread_id !== historyId);
+            this.renderChatHistory();
+            if (this.sessionId === historyId) {
+                this.currentChatHistory = [];
+                if (this.chatMessages) {
+                    this.chatMessages.innerHTML = '';
                 }
-                
-                this.showNotification('会话已清空', 'success');
-            } else {
-                throw new Error(result.message || '清空会话失败');
+                this.sessionId = null;
+                this.checkAndSetCentered();
             }
+            this.showNotification('会话已清空', 'success');
         } catch (error) {
             console.error('删除历史对话失败:', error);
             this.showNotification('删除失败: ' + error.message, 'error');
@@ -714,6 +705,7 @@ class SuperBizAgentApp {
                 this.updateCurrentChatHistory();
                 this.renderChatHistory(); // 更新历史对话列表显示
             }
+            if (this.accessToken) await this.refreshThreads();
         }
     }
 
@@ -723,14 +715,13 @@ class SuperBizAgentApp {
         const loadingMessage = this.addLoadingMessage('正在思考...');
         
         try {
-            const response = await fetch(`${this.apiBaseUrl}/agent/run`, {
+            const response = await this.authorizedFetch(`${this.apiBaseUrl}/agent/run`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    user_id: 'web-user',
-                    thread_id: this.sessionId,
+                    ...(this.sessionId ? {thread_id: this.sessionId} : {}),
                     message: message
                 })
             });
@@ -740,6 +731,8 @@ class SuperBizAgentApp {
             }
 
             const data = await response.json();
+            this.sessionId = data.thread_id || this.sessionId;
+            await this.refreshThreads();
             // 移除等待提示消息
             if (loadingMessage && loadingMessage.parentNode) {
                 loadingMessage.parentNode.removeChild(loadingMessage);
@@ -760,12 +753,11 @@ class SuperBizAgentApp {
     }
 
     async sendAgentStreamMessage(message) {
-        const response = await fetch(`${this.apiBaseUrl}/agent/run_stream`, {
+        const response = await this.authorizedFetch(`${this.apiBaseUrl}/agent/run_stream`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({
-                user_id: 'web-user',
-                thread_id: this.sessionId,
+                ...(this.sessionId ? {thread_id: this.sessionId} : {}),
                 message: message
             })
         });
@@ -785,6 +777,7 @@ class SuperBizAgentApp {
             } else if (event.type === 'run_completed') {
                 terminalReceived = true;
                 const result = event.data?.result || {};
+                this.sessionId = result.thread_id || this.sessionId;
                 fullResponse = result.answer || fullResponse;
                 this.handleStreamComplete(assistantMessage, fullResponse);
                 this.renderAgentResult(assistantMessage, result);
@@ -975,7 +968,7 @@ class SuperBizAgentApp {
     // 旧 Chat SSE 解析器保留在兼容期；当前页面不再调用。
     async sendStreamMessage(message) {
         try {
-            const response = await fetch(`${this.apiBaseUrl}/chat_stream`, {
+            const response = await this.authorizedFetch(`${this.apiBaseUrl}/chat_stream`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -1371,7 +1364,7 @@ class SuperBizAgentApp {
             formData.append('file', file);
 
             // 发送上传请求
-            const response = await fetch(`${this.apiBaseUrl}/upload`, {
+            const response = await this.authorizedFetch(`${this.apiBaseUrl}/upload`, {
                 method: 'POST',
                 body: formData
             });
@@ -1416,7 +1409,7 @@ class SuperBizAgentApp {
     // 发送智能运维请求（SSE 流式模式）
     async sendAIOpsRequest(loadingMessageElement) {
         try {
-            const response = await fetch(`${this.apiBaseUrl}/aiops`, {
+            const response = await this.authorizedFetch(`${this.apiBaseUrl}/aiops`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

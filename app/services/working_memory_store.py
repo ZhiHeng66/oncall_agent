@@ -1,6 +1,7 @@
 """PostgreSQL persistence for bounded cross-turn working-memory snapshots."""
 
 from typing import Protocol
+from uuid import UUID
 
 from psycopg.types.json import Jsonb
 from pydantic import ValidationError
@@ -12,7 +13,9 @@ from app.agent.runtime.checkpointer import PostgresPool
 class WorkingMemoryStore(Protocol):
     async def setup(self) -> None: ...
 
-    async def load(self, thread_id: str) -> WorkingMemoryContext | None: ...
+    async def load(
+        self, owner_user_id: UUID, thread_id: str
+    ) -> WorkingMemoryContext | None: ...
 
     async def create(self, context: WorkingMemoryContext) -> bool: ...
 
@@ -22,7 +25,7 @@ class WorkingMemoryStore(Protocol):
         expected_version: int,
     ) -> bool: ...
 
-    async def delete_thread(self, thread_id: str) -> None: ...
+    async def delete_thread(self, owner_user_id: UUID, thread_id: str) -> None: ...
 
 
 class PostgresWorkingMemoryStore:
@@ -47,14 +50,15 @@ class PostgresWorkingMemoryStore:
                 "run the database upgrade command"
             )
 
-    async def load(self, thread_id: str) -> WorkingMemoryContext | None:
+    async def load(self, owner_user_id: UUID, thread_id: str) -> WorkingMemoryContext | None:
         async with self._pool.connection() as connection:
             async with connection.cursor() as cursor:
                 await cursor.execute(
                     """SELECT thread_id, owner_user_id, schema_version, version,
                     context_json, last_run_id, created_at, updated_at
-                    FROM agent_working_memories WHERE thread_id = %s""",
-                    (thread_id,),
+                    FROM agent_working_memories
+                    WHERE thread_id = %s AND owner_user_id = %s""",
+                    (thread_id, owner_user_id),
                 )
                 row = await cursor.fetchone()
         if row is None:
@@ -63,7 +67,7 @@ class PostgresWorkingMemoryStore:
         payload.update(
             {
                 "thread_id": row["thread_id"],
-                "owner_user_id": row["owner_user_id"],
+                "owner_user_id": str(row["owner_user_id"]),
                 "schema_version": row["schema_version"],
                 "version": row["version"],
                 "last_run_id": row["last_run_id"],
@@ -136,12 +140,12 @@ class PostgresWorkingMemoryStore:
                 row = await cursor.fetchone()
         return row is not None
 
-    async def delete_thread(self, thread_id: str) -> None:
+    async def delete_thread(self, owner_user_id: UUID, thread_id: str) -> None:
         async with self._pool.connection() as connection:
             async with connection.cursor() as cursor:
                 await cursor.execute(
-                    "DELETE FROM agent_working_memories WHERE thread_id = %s",
-                    (thread_id,),
+                    "DELETE FROM agent_working_memories WHERE thread_id = %s AND owner_user_id = %s",
+                    (thread_id, owner_user_id),
                 )
 
     @staticmethod

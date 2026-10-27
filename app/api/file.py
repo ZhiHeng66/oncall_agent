@@ -1,12 +1,15 @@
 """文件上传接口模块"""
 
 from pathlib import Path
+from typing import Annotated
 
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
 from loguru import logger
 
 from app.agent.mcp_client import sanitize_error_message
+from app.auth.contracts import CurrentUser
+from app.auth.dependencies import require_role
 from app.services.vector_index_service import vector_index_service
 
 router = APIRouter()
@@ -20,7 +23,10 @@ MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
 
 
 @router.post("/upload")
-async def upload_file(file: UploadFile = File(...)):
+async def upload_file(
+    current_user: Annotated[CurrentUser, Depends(require_role("admin"))],
+    file: UploadFile = File(...),
+):
     """
     上传文件并自动创建向量索引
 
@@ -102,7 +108,10 @@ async def upload_file(file: UploadFile = File(...)):
 
 
 @router.post("/index_directory")
-async def index_directory(directory_path: str | None = None):
+async def index_directory(
+    current_user: Annotated[CurrentUser, Depends(require_role("admin"))],
+    directory_path: str | None = None,
+):
     """
     索引指定目录下的所有文件
 

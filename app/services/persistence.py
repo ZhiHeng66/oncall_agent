@@ -13,6 +13,7 @@ from app.agent.runtime.checkpointer import (
 )
 from app.config import Settings, config
 from app.services.run_store import MemoryRunStore, PostgresRunStore, RunStore, SqliteRunStore
+from app.services.thread_store import InMemoryThreadStore, PostgresThreadStore
 from app.services.working_memory_store import PostgresWorkingMemoryStore, WorkingMemoryStore
 
 
@@ -21,6 +22,7 @@ class PersistenceResources:
     checkpointer: BaseCheckpointSaver
     run_store: RunStore
     working_memory_store: WorkingMemoryStore | None
+    thread_store: InMemoryThreadStore | PostgresThreadStore
 
 
 class PersistenceFactory:
@@ -44,6 +46,7 @@ class PersistenceFactory:
                 checkpointer=self._checkpointers.create_memory(),
                 run_store=memory_store,
                 working_memory_store=None,
+                thread_store=InMemoryThreadStore(),
             )
             return
         if backend == "sqlite":
@@ -54,6 +57,7 @@ class PersistenceFactory:
                     checkpointer=checkpointer,
                     run_store=sqlite_store,
                     working_memory_store=None,
+                    thread_store=InMemoryThreadStore(),
                 )
             return
 
@@ -72,6 +76,7 @@ class PersistenceFactory:
                 checkpointer=self._checkpointers.create_postgres(pool),
                 run_store=postgres_store,
                 working_memory_store=working_memory_store,
+                thread_store=PostgresThreadStore(pool),
             )
         finally:
             await pool.close()

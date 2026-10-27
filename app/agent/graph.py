@@ -24,6 +24,8 @@ from app.agent.contracts import (
 )
 from app.agent.final_response import FinalResponseGenerator, final_response_generator
 from app.agent.mcp_client import sanitize_error_message
+from app.agent.memory.context import MemoryContextRenderer
+from app.agent.memory.contracts import MemoryContextView, MemoryUsage, WorkingMemoryContext
 from app.agent.runtime.checkpointer import CheckpointerFactory, checkpointer_factory
 from app.agent.runtime.limits import RuntimeLimits, runtime_limits
 from app.agent.specialists.data.agent import data_agent
@@ -32,6 +34,7 @@ from app.agent.specialists.reviewer.agent import reviewer_agent
 from app.agent.specialists.task.graph import task_agent
 from app.agent.state import MultiAgentState
 from app.agent.supervisor.agent import supervisor_agent
+from app.config import config
 
 NODE_SUPERVISOR = "supervisor"
 NODE_KNOWLEDGE = "knowledge_agent"
@@ -51,6 +54,7 @@ class Supervisor(Protocol):
         previous_results: list[AgentResult],
         review: ReviewResult | None,
         round_number: int,
+        memory_context: str = "",
     ) -> RouteDecision: ...
 
 
@@ -61,6 +65,7 @@ class Reviewer(Protocol):
         candidate_answer: str,
         evidence: list[Evidence],
         errors: list[str],
+        memory_context: str = "",
     ) -> ReviewResult: ...
 
 
@@ -78,10 +83,12 @@ class DataSpecialist(Protocol):
 
 
 class TaskSpecialist(Protocol):
-    async def run(self, task: AgentTask, thread_id: str | None = None) -> AgentResult: ...
+    async def run(
+        self, task: AgentTask, thread_id: str | None = None, run_id: str | None = None
+    ) -> AgentResult: ...
 
     def stream(
-        self, task: AgentTask, thread_id: str | None = None
+        self, task: AgentTask, thread_id: str | None = None, run_id: str | None = None
     ) -> AsyncGenerator[dict[str, Any], None]: ...
 
 
@@ -106,6 +113,7 @@ class MultiAgentGraph:
         self._reviewer: Reviewer = reviewer
         self._final_response = final_response
         self._limits = limits
+        self._memory_renderer = MemoryContextRenderer(config)
         self.checkpointer = checkpointers.create_memory()
         self.graph = self._build_graph()
 
@@ -158,6 +166,22 @@ class MultiAgentGraph:
             state["agent_results"],
             state["review_result"],
             round_number,
+            self._memory_renderer.for_supervisor(state["memory_view"]),
+        )
+        decision = decision.model_copy(
+            update={
+                "tasks": [
+                    task.model_copy(
+                        update={
+                            "context": self._merge_task_context(
+                                task.context,
+                                self._memory_renderer.for_specialist(target, state["memory_view"]),
+                            )
+                        }
+                    )
+                    for target, task in zip(decision.target_agents, decision.tasks, strict=True)
+                ]
+            }
         )
         get_stream_writer()(
             {
@@ -230,7 +254,9 @@ class MultiAgentGraph:
         result: AgentResult | None = None
         try:
             async with asyncio.timeout(self._limits.agent_timeout_seconds):
-                async for event in self._task.stream(task, thread_id=state["thread_id"]):
+                async for event in self._task.stream(
+                    task, thread_id=state["thread_id"], run_id=state["run_id"]
+                ):
                     if event.get("type") in {"run_completed", "run_failed"}:
                         result = AgentResult.model_validate(event["result"])
                         continue
@@ -367,6 +393,7 @@ class MultiAgentGraph:
                 state["candidate_answer"],
                 evidence,
                 errors,
+                self._memory_renderer.for_reviewer(state["memory_view"]),
             )
         except Exception as exc:
             detail = sanitize_error_message(str(exc))
@@ -456,6 +483,7 @@ class MultiAgentGraph:
             and state["status"] == "completed"
             and decision is not None
             and decision.mode in {"direct", "single"}
+            and not state["memory_usage"].used
         )
         return NODE_FINALIZE if is_fast_success else NODE_REVIEWER
 
@@ -477,12 +505,23 @@ class MultiAgentGraph:
         user_id: str,
         thread_id: str,
         run_id: str | None = None,
+        working_memory: WorkingMemoryContext | None = None,
+        memory_view: MemoryContextView | None = None,
+        memory_usage: MemoryUsage | None = None,
     ) -> MultiAgentRunResult:
         resolved_run_id = run_id or str(uuid4())
         try:
             result = await self.graph.ainvoke(
-                self._initial_state(user_query, user_id, thread_id, resolved_run_id),
-                config=self._config(thread_id, resolved_run_id),
+                self._initial_state(
+                    user_query,
+                    user_id,
+                    thread_id,
+                    resolved_run_id,
+                    working_memory,
+                    memory_view,
+                    memory_usage,
+                ),
+                config=self._config(user_id, thread_id, resolved_run_id),
             )
         except Exception as exc:
             detail = sanitize_error_message(str(exc))
@@ -503,12 +542,23 @@ class MultiAgentGraph:
         user_id: str,
         thread_id: str,
         run_id: str | None = None,
+        working_memory: WorkingMemoryContext | None = None,
+        memory_view: MemoryContextView | None = None,
+        memory_usage: MemoryUsage | None = None,
     ) -> AsyncGenerator[dict[str, Any], None]:
         resolved_run_id = run_id or str(uuid4())
-        graph_config = self._config(thread_id, resolved_run_id)
+        graph_config = self._config(user_id, thread_id, resolved_run_id)
         try:
             async for mode, event in self.graph.astream(
-                self._initial_state(user_query, user_id, thread_id, resolved_run_id),
+                self._initial_state(
+                    user_query,
+                    user_id,
+                    thread_id,
+                    resolved_run_id,
+                    working_memory,
+                    memory_view,
+                    memory_usage,
+                ),
                 config=graph_config,
                 stream_mode=["custom", "updates"],
             ):
@@ -528,12 +578,12 @@ class MultiAgentGraph:
             )
         yield {"type": "graph_completed", "result": result.model_dump(mode="json")}
 
-    async def delete_run_state(self, thread_id: str, run_id: str) -> None:
-        await self.checkpointer.adelete_thread(f"{thread_id}:{run_id}")
+    async def delete_run_state(self, user_id: str, thread_id: str, run_id: str) -> None:
+        await self.checkpointer.adelete_thread(f"{user_id}:{thread_id}:{run_id}")
 
-    def _config(self, thread_id: str, run_id: str) -> dict[str, Any]:
+    def _config(self, user_id: str, thread_id: str, run_id: str) -> dict[str, Any]:
         return {
-            "configurable": {"thread_id": f"{thread_id}:{run_id}"},
+            "configurable": {"thread_id": f"{user_id}:{thread_id}:{run_id}"},
             "recursion_limit": self._limits.graph_recursion_limit,
         }
 
@@ -543,12 +593,18 @@ class MultiAgentGraph:
         user_id: str,
         thread_id: str,
         run_id: str,
+        working_memory: WorkingMemoryContext | None = None,
+        memory_view: MemoryContextView | None = None,
+        memory_usage: MemoryUsage | None = None,
     ) -> MultiAgentState:
         return {
             "user_id": user_id,
             "thread_id": thread_id,
             "run_id": run_id,
             "user_query": user_query,
+            "working_memory": working_memory,
+            "memory_view": memory_view or MemoryContextView(),
+            "memory_usage": memory_usage or MemoryUsage(),
             "route_decision": None,
             "pending_tasks": [],
             "dispatch_task": None,
@@ -564,6 +620,13 @@ class MultiAgentGraph:
             "termination_reason": "",
             "workflow_errors": [],
         }
+
+    @staticmethod
+    def _merge_task_context(existing: str, memory_context: str) -> str:
+        merged = "\n\n".join(part for part in (existing.strip(), memory_context.strip()) if part)
+        if len(merged) <= config.working_memory_context_max_chars:
+            return merged
+        return merged[: config.working_memory_context_max_chars - 1].rstrip() + "…"
 
     @staticmethod
     def _latest_results(results: list[AgentResult]) -> list[AgentResult]:

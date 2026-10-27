@@ -25,7 +25,7 @@ NC = \033[0m
         ipython watch add add-dev remove list-docs test-upload sync logs \
         start-cls stop-cls start-monitor stop-monitor start-ticket stop-ticket \
         start-api stop-api status-mcp postgres-up postgres-down postgres-status db-upgrade \
-        db-migrate-sqlite
+        postgres-wait db-migrate-sqlite
 
 # ============================================================
 # 默认目标：显示帮助信息
@@ -105,16 +105,20 @@ init:
 	@echo "$(GREEN)🚀 开始初始化企业知识服务多智能体协同平台...$(NC)"
 	@echo "$(GREEN)═══════════════════════════════════════════════════════$(NC)"
 	@echo ""
-	@echo "$(YELLOW)步骤 1/4: 启动 Docker 容器（Milvus 向量数据库）$(NC)"
+	@echo "$(YELLOW)步骤 1/5: 启动 Docker 容器（Milvus + PostgreSQL）$(NC)"
 	@$(MAKE) up
+	@$(MAKE) postgres-up
 	@echo ""
-	@echo "$(YELLOW)步骤 2/4: 启动 FastAPI 服务$(NC)"
+	@echo "$(YELLOW)步骤 2/5: 初始化 PostgreSQL Schema$(NC)"
+	@$(MAKE) db-upgrade
+	@echo ""
+	@echo "$(YELLOW)步骤 3/5: 启动 FastAPI 服务$(NC)"
 	@$(MAKE) start
 	@echo ""
-	@echo "$(YELLOW)步骤 3/4: 等待服务就绪$(NC)"
+	@echo "$(YELLOW)步骤 4/5: 等待服务就绪$(NC)"
 	@$(MAKE) wait
 	@echo ""
-	@echo "$(YELLOW)步骤 4/4: 上传文档到向量数据库$(NC)"
+	@echo "$(YELLOW)步骤 5/5: 上传文档到向量数据库$(NC)"
 	@$(MAKE) upload
 	@echo ""
 	@echo "$(GREEN)═══════════════════════════════════════════════════════$(NC)"
@@ -198,7 +202,28 @@ status:
 
 postgres-up:
 	@docker compose -f $(POSTGRES_COMPOSE) up -d
-	@echo "$(GREEN)PostgreSQL container started.$(NC)"
+	@$(MAKE) postgres-wait
+
+postgres-wait:
+	@echo "$(YELLOW)Waiting for PostgreSQL to become healthy...$(NC)"
+	@attempt=0; \
+	while [ $$attempt -lt 60 ]; do \
+		status=$$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' oncall-postgres 2>/dev/null || true); \
+		if [ "$$status" = "healthy" ]; then \
+			echo "$(GREEN)PostgreSQL is healthy.$(NC)"; \
+			exit 0; \
+		fi; \
+		if [ "$$status" = "exited" ] || [ "$$status" = "dead" ]; then \
+			echo "$(RED)PostgreSQL stopped before becoming healthy. Recent logs:$(NC)"; \
+			docker logs oncall-postgres --tail 50; \
+			exit 1; \
+		fi; \
+		attempt=$$((attempt + 1)); \
+		sleep 1; \
+	done; \
+	echo "$(RED)PostgreSQL did not become healthy within 60 seconds.$(NC)"; \
+	docker logs oncall-postgres --tail 50; \
+	exit 1
 
 postgres-down:
 	@docker compose -f $(POSTGRES_COMPOSE) down
@@ -206,7 +231,7 @@ postgres-down:
 postgres-status:
 	@docker compose -f $(POSTGRES_COMPOSE) ps
 
-db-upgrade:
+db-upgrade: postgres-wait
 	@$(PYTHON) -m app.cli.database upgrade
 
 db-migrate-sqlite:
@@ -352,6 +377,9 @@ start:
 	@echo "$(GREEN)🚀 启动所有服务$(NC)"
 	@echo "$(GREEN)═══════════════════════════════════════════════════════$(NC)"
 	@echo ""
+	@$(MAKE) postgres-up
+	@$(MAKE) db-upgrade
+	@echo ""
 	@$(MAKE) start-cls
 	@sleep 1
 	@echo ""
@@ -484,12 +512,12 @@ check:
 	fi
 
 # 开发模式运行（前台，热重载）
-dev:
+dev: postgres-up db-upgrade
 	@echo "$(YELLOW)🔧 启动开发服务器（热重载）...$(NC)"
 	.venv/bin/python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 9900
 
 # 生产模式运行（前台）
-run:
+run: postgres-up db-upgrade
 	@echo "$(YELLOW)🏭 启动生产服务器...$(NC)"
 	.venv/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port 9900
 

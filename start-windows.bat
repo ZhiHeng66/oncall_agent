@@ -101,7 +101,7 @@ REM 设置 Python 命令
 set PYTHON_CMD=.venv\Scripts\python.exe
 
 REM 启动 Docker Compose
-echo [4/9] 启动 Milvus 向量数据库...
+echo [4/10] 启动 Milvus 向量数据库...
 docker ps --format "{{.Names}}" | findstr "milvus-standalone" >nul 2>&1
 if not errorlevel 1 (
     echo [信息] Milvus 容器已在运行
@@ -118,29 +118,59 @@ if not errorlevel 1 (
 echo [成功] Milvus 数据库就绪
 echo.
 
+REM 启动 PostgreSQL 并初始化项目 Schema
+echo [5/10] 启动 PostgreSQL 并初始化 Schema...
+docker compose -f postgres-database.yml up -d
+if errorlevel 1 (
+    echo [错误] PostgreSQL 启动失败，请检查 .env 中的 POSTGRES_PASSWORD
+    pause
+    exit /b 1
+)
+set PG_READY=0
+for /L %%i in (1,1,60) do (
+    for /f %%s in ('docker inspect -f "{{.State.Health.Status}}" oncall-postgres 2^>nul') do (
+        if "%%s"=="healthy" set PG_READY=1
+    )
+    if !PG_READY!==1 goto :postgres_ready
+    timeout /t 1 /nobreak >nul
+)
+echo [错误] PostgreSQL 在 60 秒内未通过健康检查，请使用 docker logs oncall-postgres 查看日志
+pause
+exit /b 1
+
+:postgres_ready
+%PYTHON_CMD% -m app.cli.database upgrade
+if errorlevel 1 (
+    echo [错误] PostgreSQL Schema 初始化失败，请检查 DATABASE_URL
+    pause
+    exit /b 1
+)
+echo [成功] PostgreSQL 与 Schema 已就绪
+echo.
+
 REM 启动 CLS MCP 服务
-echo [5/9] 启动 CLS MCP 服务...
+echo [6/10] 启动 CLS MCP 服务...
 start "CLS MCP Server" /min %PYTHON_CMD% mcp_servers/cls_server.py
 timeout /t 2 /nobreak >nul
 echo [成功] CLS MCP 服务已启动
 echo.
 
 REM 启动 Monitor MCP 服务
-echo [6/9] 启动 Monitor MCP 服务...
+echo [7/10] 启动 Monitor MCP 服务...
 start "Monitor MCP Server" /min %PYTHON_CMD% mcp_servers/monitor_server.py
 timeout /t 2 /nobreak >nul
 echo [成功] Monitor MCP 服务已启动
 echo.
 
 REM 启动 FastAPI 服务
-echo [7/9] 启动 Business Ticket MCP 服务...
+echo [8/10] 启动 Business Ticket MCP 服务...
 start "Business Ticket MCP Server" /min %PYTHON_CMD% mcp_servers/ticket_server.py
 timeout /t 2 /nobreak >nul
 echo [成功] Business Ticket MCP 服务已启动
 echo.
 
 REM 启动 FastAPI 服务
-echo [8/9] 启动 FastAPI 服务...
+echo [9/10] 启动 FastAPI 服务...
 start "Enterprise Knowledge Agent API" %PYTHON_CMD% -m uvicorn app.main:app --host 0.0.0.0 --port 9900
 echo [信息] 等待服务启动（15秒）...
 timeout /t 15 /nobreak >nul
@@ -157,7 +187,7 @@ if errorlevel 1 (
     echo.
     
     REM 调用 API 上传 business-docs 文档到向量数据库
-    echo [9/9] 上传文档到向量数据库...
+    echo [10/10] 上传文档到向量数据库...
     for %%f in (business-docs\*.md) do (
         echo   上传: %%~nxf
         curl -s -X POST http://localhost:9900/api/upload -F "file=@%%f" >nul 2>&1

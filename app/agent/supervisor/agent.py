@@ -16,6 +16,7 @@ class SupervisorRouter(Protocol):
         previous_results: list[AgentResult],
         review: ReviewResult | None,
         round_number: int,
+        memory_context: str = "",
     ) -> RouteDecision: ...
 
 
@@ -29,6 +30,7 @@ class LLMSupervisorRouter:
         previous_results: list[AgentResult],
         review: ReviewResult | None,
         round_number: int,
+        memory_context: str = "",
     ) -> RouteDecision:
         model = self._model or llm_factory.create_chat_model(role="supervisor")
         chain = SUPERVISOR_ROUTE_PROMPT | model.with_structured_output(RouteDecision)
@@ -38,6 +40,7 @@ class LLMSupervisorRouter:
                 "previous_results": self._format_results(previous_results),
                 "review_feedback": self._format_review(review),
                 "round_number": round_number,
+                "memory_context": memory_context or "无",
             }
         )
         return (
@@ -76,12 +79,15 @@ class SupervisorAgent:
         previous_results: list[AgentResult],
         review: ReviewResult | None,
         round_number: int,
+        memory_context: str = "",
     ) -> RouteDecision:
         if review and review.retry_target in {"knowledge", "data", "task"}:
             return self._directed_retry(user_query, review, round_number)
         try:
             router = self._router or LLMSupervisorRouter()
-            return await router.decide(user_query, previous_results, review, round_number)
+            return await router.decide(
+                user_query, previous_results, review, round_number, memory_context
+            )
         except Exception:
             return self._fallback_route(user_query, round_number)
 
